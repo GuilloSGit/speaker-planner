@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "Guillermo Andrada",
-      url: "https://guillermoandrada.com",
+      url: "https://GA-Software.wuaze.com",
     },
   ],
   openGraph: {
@@ -28,13 +28,6 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "Speaker Planner",
-  },
-  twitter: {
-    title: "Speaker Planner",
-    description: "Speaker Planner",
-    card: "summary_large_image",
-    site: "@guillermoandrada",
-    creator: "@guillermoandrada",
   },
 };
 
