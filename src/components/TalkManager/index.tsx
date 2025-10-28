@@ -253,7 +253,7 @@ const TalkManager: React.FC = () => {
         // Agregar nombre y teléfono
         output += `\n${speaker.family_name}, ${speaker.first_name}`;
         if (speaker.phone) {
-          output += ` ( +${speaker.phone} )`;
+          output += ` ( +54 ${speaker.phone} )`;
         }
         output += ":\n";
 
@@ -336,7 +336,7 @@ const TalkManager: React.FC = () => {
                     <input
                       type="tel"
                       id="phone"
-                      value={'+54 ' + newSpeakerPhone}
+                      value={newSpeakerPhone}
                       onChange={(e) => setNewSpeakerPhone(e.target.value)}
                       placeholder="11 1234-5678"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"

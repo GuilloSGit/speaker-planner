@@ -48,7 +48,7 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
           </div>
           {!isEditingPhone ? (
             <div className="mt-2 flex items-center text-sm text-gray-600">
-              <span>{'+' + speaker.phone || 'Sin teléfono'}</span>
+              <span>{'+54 ' + speaker.phone || 'Sin teléfono'}</span>
               <button 
                 onClick={() => {
                   setEditingPhone(speaker.phone || '');
