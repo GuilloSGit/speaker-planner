@@ -139,7 +139,7 @@ const TalkManager: React.FC = () => {
           phone: speaker.phone || '',
           role: speaker.role,
           available: speaker.available !== undefined ? speaker.available : true, // Preserve availability from import or default to true
-          talks: (speaker.talks || []).map(talk => ({
+          talks: (speaker.talks || []).map((talk: { id: number; available?: boolean; assigned_date?: string }) => ({
             id: talk.id,
             available: talk.available !== undefined ? talk.available : true, // Preserve talk availability or default to true
             assigned_date: talk.assigned_date || ''
