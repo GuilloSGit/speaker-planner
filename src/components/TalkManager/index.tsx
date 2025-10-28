@@ -336,7 +336,7 @@ const TalkManager: React.FC = () => {
                     <input
                       type="tel"
                       id="phone"
-                      value={newSpeakerPhone}
+                      value={'+54 ' + newSpeakerPhone}
                       onChange={(e) => setNewSpeakerPhone(e.target.value)}
                       placeholder="11 1234-5678"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
