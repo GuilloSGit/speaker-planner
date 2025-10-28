@@ -7,6 +7,7 @@ interface SpeakerCardProps {
   speaker: Speaker;
   onToggleAvailability: (speakerId: string, currentAvailability: boolean) => void;
   onChangeRole: (speakerId: string, newRole: string) => void;
+  onUpdatePhone: (speakerId: string, newPhone: string) => void;
   onRemove: (speakerId: string) => void;
   onToggleTalkAvailability: (speakerId: string, talkId: number, currentAvailability: boolean) => void;
   onRemoveTalk: (speakerId: string, talkId: number) => void;
@@ -18,6 +19,7 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
   speaker,
   onToggleAvailability,
   onChangeRole,
+  onUpdatePhone,
   onRemove,
   onToggleTalkAvailability,
   onRemoveTalk,
@@ -25,21 +27,67 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
   SPEAKER_ROLES,
 }) => {
   const [isAddingTalk, setIsAddingTalk] = useState(false);
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [newTalkId, setNewTalkId] = useState('');
+  const [editingPhone, setEditingPhone] = useState(speaker.phone || '');
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 mb-6">
-      <div className="flex items-center justify-between border-b pb-3 mb-3">
-        <div className="flex items-center space-x-3">
-          <span 
-            className={`text-2xl transition-colors ${speaker.available ? 'text-green-500' : 'text-red-500'} cursor-pointer select-none`}
-            onClick={() => onToggleAvailability(speaker.id, speaker.available)}
-          >
-            {speaker.available ? '🟢' : '🔴'}
-          </span>
-          <h3 className="text-xl font-bold text-gray-800 select-none">
-            {speaker.family_name}, {speaker.first_name}
-          </h3>
+      <div className="flex items-start justify-between border-b pb-3 mb-3">
+        <div className="flex-1">
+          <div className="flex items-center space-x-3">
+            <span 
+              className={`text-2xl transition-colors ${speaker.available ? 'text-green-500' : 'text-red-500'} cursor-pointer select-none`}
+              onClick={() => onToggleAvailability(speaker.id, speaker.available)}
+            >
+              {speaker.available ? '🟢' : '🔴'}
+            </span>
+            <h3 className="text-xl font-bold text-gray-800 select-none">
+              {speaker.family_name}, {speaker.first_name}
+            </h3>
+          </div>
+          {!isEditingPhone ? (
+            <div className="mt-2 flex items-center text-sm text-gray-600">
+              <span>{'+' + speaker.phone || 'Sin teléfono'}</span>
+              <button 
+                onClick={() => {
+                  setEditingPhone(speaker.phone || '');
+                  setIsEditingPhone(true);
+                }}
+                className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+              >
+                Editar
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center space-x-2">
+              <input
+                type="tel"
+                value={editingPhone}
+                onChange={(e) => setEditingPhone(e.target.value)}
+                placeholder="+54 9 11 1234-5678"
+                className="text-sm px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-600"
+              />
+              <button 
+                onClick={() => {
+                  onUpdatePhone(speaker.id, editingPhone);
+                  setIsEditingPhone(false);
+                }}
+                className="text-green-600 hover:text-green-800 text-sm"
+              >
+                ✓
+              </button>
+              <button 
+                onClick={() => {
+                  setIsEditingPhone(false);
+                  setEditingPhone(speaker.phone || '');
+                }}
+                className="text-red-600 hover:text-red-800 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
           <select

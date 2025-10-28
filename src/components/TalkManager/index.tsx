@@ -12,6 +12,7 @@ const TalkManager: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [newSpeakerName, setNewSpeakerName] = useState({ first: '', family: '' });
+  const [newSpeakerPhone, setNewSpeakerPhone] = useState('');
   const [newSpeakerRole, setNewSpeakerRole] = useState(SPEAKER_ROLES[0].value);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -20,9 +21,9 @@ const TalkManager: React.FC = () => {
   // Efecto para autenticación
   useEffect(() => {
     console.log('Iniciando efecto de autenticación');
-    
+
     const handleAuthStateChanged = async (user: any) => {
-      
+
       if (user) {
         setUserId(user.uid);
       } else {
@@ -57,11 +58,11 @@ const TalkManager: React.FC = () => {
     }
 
     const talksPath = getTalksPath(userId);
-    
+
     try {
       const q = query(collection(db, talksPath));
-      
-      const unsubscribe = onSnapshot(q, 
+
+      const unsubscribe = onSnapshot(q,
         (snapshot) => {
           const speakersData: Speaker[] = [];
           snapshot.forEach((doc) => {
@@ -69,7 +70,7 @@ const TalkManager: React.FC = () => {
           });
           setSpeakers(speakersData);
           setIsLoading(false);
-        }, 
+        },
         (error: any) => {
           console.error('Error al cargar datos de Firestore:', error);
           console.error('Código de error:', error.code);
@@ -99,7 +100,7 @@ const TalkManager: React.FC = () => {
   // Función para actualizar un conferenciante
   const updateSpeaker = useCallback(async (speakerId: string, data: Partial<Speaker>) => {
     if (!userId) return;
-    
+
     try {
       const speakerRef = doc(db, getTalksPath(userId), speakerId);
       await setDoc(speakerRef, data, { merge: true });
@@ -118,6 +119,10 @@ const TalkManager: React.FC = () => {
     updateSpeaker(speakerId, { role: newRole });
   }, [updateSpeaker]);
 
+  const handleUpdatePhone = useCallback((speakerId: string, newPhone: string) => {
+    updateSpeaker(speakerId, { phone: newPhone });
+  }, [updateSpeaker]);
+
   const handleAddSpeaker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !newSpeakerName.first.trim() || !newSpeakerName.family.trim()) {
@@ -129,11 +134,13 @@ const TalkManager: React.FC = () => {
       await addDoc(collection(db, getTalksPath(userId)), {
         first_name: newSpeakerName.first.trim(),
         family_name: newSpeakerName.family.trim(),
+        phone: newSpeakerPhone.trim(),
         role: newSpeakerRole,
         available: true,
         talks: [],
       });
       setNewSpeakerName({ first: '', family: '' });
+      setNewSpeakerPhone('');
       setNewSpeakerRole(SPEAKER_ROLES[0].value);
     } catch (error) {
       console.error("Error adding speaker:", error);
@@ -148,7 +155,7 @@ const TalkManager: React.FC = () => {
 
   const handleConfirmDelete = async () => {
     if (!userId || !speakerToDelete) return;
-    
+
     try {
       await deleteDoc(doc(db, getTalksPath(userId), speakerToDelete));
       setShowDeleteDialog(false);
@@ -168,10 +175,10 @@ const TalkManager: React.FC = () => {
     const speaker = speakers.find(s => s.id === speakerId);
     if (!speaker) return;
 
-    const updatedTalks = speaker.talks.map(talk => 
+    const updatedTalks = speaker.talks.map(talk =>
       talk.id === talkId ? { ...talk, available: !currentAvailability } : talk
     );
-    
+
     updateSpeaker(speakerId, { talks: updatedTalks });
   }, [speakers]);
 
@@ -208,7 +215,7 @@ const TalkManager: React.FC = () => {
     if (speakers.length === 0) return "No hay conferenciantes registrados.";
 
     let output = "=== LISTA DE CONFERENCIANTES ===\n\n";
-    
+
     // Agrupar por rol
     const groupedSpeakers = speakers.reduce((acc, speaker) => {
       if (!acc[speaker.role]) {
@@ -230,9 +237,9 @@ const TalkManager: React.FC = () => {
     // Generar el texto para cada grupo
     sortedGroups.forEach(([role, roleSpeakers]) => {
       output += `=== ${role.toUpperCase()}S ===\n`;
-      
+
       // Ordenar por apellido
-      const sortedSpeakers = [...roleSpeakers].sort((a, b) => 
+      const sortedSpeakers = [...roleSpeakers].sort((a, b) =>
         a.family_name.localeCompare(b.family_name)
       );
 
@@ -243,8 +250,14 @@ const TalkManager: React.FC = () => {
       });
 
       speakersWithTalks.forEach(speaker => {
-        output += `\n${speaker.family_name}, ${speaker.first_name}:\n`;
-        
+        // Agregar nombre y teléfono
+        output += `\n${speaker.family_name}, ${speaker.first_name}`;
+        if (speaker.phone) {
+          output += ` ( +${speaker.phone} )`;
+        }
+        output += ":\n";
+
+        // Agregar discursos disponibles
         const availableTalks = speaker.talks
           .filter(talk => talk.available)
           .sort((a, b) => a.id - b.id);
@@ -254,7 +267,7 @@ const TalkManager: React.FC = () => {
           output += `  - ${talk.id} - ${talkInfo?.title || 'Título no encontrado'}\n`;
         });
       });
-      
+
       output += "\n";
     });
 
@@ -316,26 +329,40 @@ const TalkManager: React.FC = () => {
                       required
                     />
                   </div>
-                </div>
-                <div className="col-span-1">
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                    Rol
-                  </label>
-                  <select
-                    id="role"
-                    value={newSpeakerRole}
-                    onChange={(e) => setNewSpeakerRole(e.target.value)}
-                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
-                  >
-                    {SPEAKER_ROLES.map(role => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                      Teléfono
+                    </label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      value={newSpeakerPhone}
+                      onChange={(e) => setNewSpeakerPhone(e.target.value)}
+                      placeholder="11 1234-5678"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+                      Rol
+                    </label>
+                    <select
+                      id="role"
+                      value={newSpeakerRole}
+                      onChange={(e) => setNewSpeakerRole(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
+                    >
+                      {SPEAKER_ROLES.map(role => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <button
-                  disabled={!newSpeakerName.first || !newSpeakerName.family }
+                  disabled={!newSpeakerName.first || !newSpeakerName.family}
                   type="submit"
                   className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:pointer"
                 >
@@ -367,6 +394,7 @@ const TalkManager: React.FC = () => {
                       onToggleTalkAvailability={handleToggleTalkAvailability}
                       onRemoveTalk={handleRemoveTalk}
                       onAddTalk={handleAddTalk}
+                      onUpdatePhone={handleUpdatePhone}
                       SPEAKER_ROLES={SPEAKER_ROLES}
                     />
                   ))}
@@ -404,9 +432,9 @@ const TalkManager: React.FC = () => {
 
       {/* Alertas */}
       {alertMessage && (
-        <Alert 
-          message={alertMessage} 
-          onClose={() => setAlertMessage(null)} 
+        <Alert
+          message={alertMessage}
+          onClose={() => setAlertMessage(null)}
         />
       )}
 
