@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SpeakerCard } from './SpeakerCard';
 import { Alert } from './Alert';
+import { ConfirmationDialog } from './ConfirmationDialog';
 import { Speaker } from '@/types';
 import { MASTER_TALKS, SPEAKER_ROLES, getTalksPath } from '@/lib/constants';
 import { auth, db, doc, setDoc, collection, onSnapshot, query, addDoc, deleteDoc, signInAnonymously } from '@/lib/firebase';
@@ -16,7 +17,9 @@ const TalkManager: React.FC = () => {
   const [newSpeakerRole, setNewSpeakerRole] = useState(SPEAKER_ROLES[0].value);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [speakerToDelete, setSpeakerToDelete] = useState<string | null>(null);
+  const [importData, setImportData] = useState<Speaker[]>([]);
 
   // Efecto para autenticación
   useEffect(() => {
@@ -95,6 +98,113 @@ const TalkManager: React.FC = () => {
     const output = shareableOutput;
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(output)}`;
     window.open(whatsappLink, '_blank');
+  };
+
+
+  const generateJSON = () => {
+    const json = JSON.stringify(speakers, null, 2);
+    // Copiar al portapapeles
+    navigator.clipboard.writeText(json);
+
+    // Crear un enlace de descarga
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conferenciantes-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setAlertMessage("¡JSON generado y copiado al portapapeles!");
+  };
+
+  const processFileUpload = async (data: any[]) => {
+    if (!userId) return;
+
+    try {
+      // Eliminar los oradores existentes
+      const deletePromises = speakers.map(speaker =>
+        deleteDoc(doc(db, getTalksPath(userId), speaker.id))
+      );
+
+      await Promise.all(deletePromises);
+
+      // Agregar los nuevos oradores
+      const addPromises = data.map(speaker =>
+        setDoc(doc(db, getTalksPath(userId), speaker.id), {
+          first_name: speaker.first_name,
+          family_name: speaker.family_name,
+          phone: speaker.phone || '',
+          role: speaker.role,
+          available: speaker.available !== undefined ? speaker.available : true, // Preserve availability from import or default to true
+          talks: (speaker.talks || []).map(talk => ({
+            id: talk.id,
+            available: talk.available !== undefined ? talk.available : true, // Preserve talk availability or default to true
+            assigned_date: talk.assigned_date || ''
+          })),
+          created_at: speaker.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      );
+
+      await Promise.all(addPromises);
+      setAlertMessage('¡Datos cargados correctamente!');
+    } catch (error) {
+      console.error('Error al procesar el archivo:', error);
+      setAlertMessage(`Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setShowImportDialog(false);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+
+        if (!Array.isArray(data)) {
+          throw new Error('El archivo debe contener un arreglo de oradores');
+        }
+
+        const isValid = data.every(speaker =>
+          speaker.id &&
+          speaker.first_name &&
+          speaker.family_name &&
+          speaker.role &&
+          Array.isArray(speaker.talks)
+        );
+
+        if (!isValid) {
+          setAlertMessage('El formato del archivo no es válido');
+          return;
+        }
+
+        // Guardar los datos y mostrar el diálogo de confirmación
+        setImportData(data);
+        setShowImportDialog(true);
+        
+      } catch (error) {
+        console.error('Error al leer el archivo:', error);
+        setAlertMessage(`Error al leer el archivo: ${error instanceof Error ? error.message : 'Formato inválido'}`);
+      } finally {
+        // Limpiar el input para permitir cargar el mismo archivo de nuevo
+        event.target.value = '';
+      }
+    };
+
+    reader.onerror = () => {
+      setAlertMessage('Error al leer el archivo');
+    };
+
+    reader.readAsText(file);
   };
 
   // Función para actualizar un conferenciante
@@ -243,13 +353,13 @@ const TalkManager: React.FC = () => {
         a.family_name.localeCompare(b.family_name)
       );
 
-      // Filtrar oradores que tengan al menos un discurso disponible
-      const speakersWithTalks = sortedSpeakers.filter(speaker => {
-        if (!speaker.available) return false;
-        return speaker.talks.some(talk => talk.available);
-      });
+      // Mostrar solo oradores disponibles
+      const availableSpeakers = sortedSpeakers.filter(speaker => speaker.available);
 
-      speakersWithTalks.forEach(speaker => {
+      availableSpeakers.forEach(speaker => {
+        // Filtrar solo los discursos disponibles del orador
+        const availableTalks = speaker.talks.filter(talk => talk.available);
+        if (availableTalks.length === 0) return; // Saltar si no hay discursos disponibles
         // Agregar nombre y teléfono
         output += `\n${speaker.family_name}, ${speaker.first_name}`;
         if (speaker.phone) {
@@ -257,11 +367,7 @@ const TalkManager: React.FC = () => {
         }
         output += ":\n";
 
-        // Agregar discursos disponibles
-        const availableTalks = speaker.talks
-          .filter(talk => talk.available)
-          .sort((a, b) => a.id - b.id);
-
+        // Agregar discursos (ya filtrados como disponibles)
         availableTalks.forEach(talk => {
           const talkInfo = MASTER_TALKS.find(t => t.id === talk.id);
           output += `  - ${talk.id} - ${talkInfo?.title || 'Título no encontrado'}\n`;
@@ -425,6 +531,31 @@ const TalkManager: React.FC = () => {
               >
                 Enviarlo por WhatsApp
               </button>
+              <div className="mt-4 space-y-2">
+                <div className="flex gap-2 w-full">
+                  <button
+                    onClick={generateJSON}
+                    className="w-1/2 bg-yellow-400 text-white py-2 px-4 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                  >
+                    Exportar a JSON
+                  </button>
+                  <div className="relative w-1/2">
+                    <input
+                      type="file"
+                      id="json-upload"
+                      accept=".json"
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <label
+                      htmlFor="json-upload"
+                      className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors text-center cursor-pointer"
+                    >
+                      Importar desde JSON
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -437,6 +568,16 @@ const TalkManager: React.FC = () => {
           onClose={() => setAlertMessage(null)}
         />
       )}
+
+      <ConfirmationDialog
+        isOpen={showImportDialog}
+        title="Confirmar importación"
+        message="¿Estás seguro de que deseas cargar estos datos? Se sobrescribirán los datos actuales."
+        onConfirm={() => processFileUpload(importData)}
+        onCancel={() => setShowImportDialog(false)}
+        confirmText="Sí, importar"
+        cancelText="Cancelar"
+      />
 
       {/* Diálogo de confirmación de eliminación */}
       {showDeleteDialog && (
