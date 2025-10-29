@@ -33,28 +33,28 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 mb-6">
-      <div className="flex items-start justify-between border-b pb-3 mb-3">
+      <div className="flex items-start md:items-center justify-between border-b pb-3 mb-3">
         <div className="flex-1">
           <div className="flex items-center space-x-3">
             <span 
-              className={`text-2xl transition-colors ${speaker.available ? 'text-green-500' : 'text-red-500'} cursor-pointer select-none`}
+              className={`md:text-2xl text-lg transition-colors ${speaker.available ? 'text-green-500' : 'text-red-500'} cursor-pointer select-none`}
               onClick={() => onToggleAvailability(speaker.id, speaker.available)}
             >
               {speaker.available ? '🟢' : '🔴'}
             </span>
-            <h3 className="text-xl font-bold text-gray-800 select-none">
+            <h3 className="text-md md:text-xl font-bold text-gray-800 select-none">
               {speaker.family_name}, {speaker.first_name}
             </h3>
           </div>
           {!isEditingPhone ? (
-            <div className="mt-2 flex items-center text-sm text-gray-600">
+            <div className="mt-2 flex items-center text-gray-600">
               <span>{'+54 ' + speaker.phone || 'Sin teléfono'}</span>
               <button 
                 onClick={() => {
                   setEditingPhone(speaker.phone || '');
                   setIsEditingPhone(true);
                 }}
-                className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                className="hidden md:block ml-2 text-blue-600 hover:text-blue-800 text-xs md:text-sm"
               >
                 Editar
               </button>
@@ -73,7 +73,7 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
                   onUpdatePhone(speaker.id, editingPhone);
                   setIsEditingPhone(false);
                 }}
-                className="text-green-600 hover:text-green-800 text-sm"
+                className="text-green-600 hover:text-green-800 text-xs md:text-sm"
               >
                 ✓
               </button>
@@ -82,18 +82,18 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
                   setIsEditingPhone(false);
                   setEditingPhone(speaker.phone || '');
                 }}
-                className="text-red-600 hover:text-red-800 text-sm"
+                className="text-red-600 hover:text-red-800 text-xs md:text-sm"
               >
                 ✕
               </button>
             </div>
           )}
         </div>
-        <div className="flex space-x-2">
+        <div className="flex md:justify-between justify-start space-x-2">
           <select
             value={speaker.role}
             onChange={(e) => onChangeRole(speaker.id, e.target.value)}
-            className="px-3 py-1 text-sm font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1 md:text-sm text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200 focus:ring-blue-500 focus:border-blue-500"
           >
             {SPEAKER_ROLES.map(role => (
               <option key={role.value} value={role.value}>
@@ -103,7 +103,7 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
           </select>
           <button
             onClick={() => onToggleAvailability(speaker.id, speaker.available)}
-            className={`px-3 py-1 text-xs font-semibold cursor-pointer rounded-full transition-colors ${
+            className={`hidden md:block px-3 py-1 text-xs font-semibold cursor-pointer rounded-full transition-colors ${
               speaker.available
                 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
                 : 'bg-green-100 text-green-700 hover:bg-green-200'
