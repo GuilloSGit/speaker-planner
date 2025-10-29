@@ -12,7 +12,7 @@ const TalkManager: React.FC = () => {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [newSpeakerCongregation, setNewSpeakerCongregation] = useState('');
+  const [congregation, setCongregation] = useState('');
   const [newSpeakerName, setNewSpeakerName] = useState({ first: '', family: '' });
   const [newSpeakerPhone, setNewSpeakerPhone] = useState('');
   const [newSpeakerRole, setNewSpeakerRole] = useState(SPEAKER_ROLES[0].value);
@@ -98,7 +98,14 @@ const TalkManager: React.FC = () => {
   };
 
   const generateJSON = () => {
-    const json = JSON.stringify(speakers, null, 2);
+    // Crear objeto con la información global y la lista de oradores
+    const exportData = {
+      congregation_name: congregation,
+      addDateStamp: addDateStamp,
+      speakers: speakers
+    };
+    
+    const json = JSON.stringify(exportData, null, 2);
     // Copiar al portapapeles
     navigator.clipboard.writeText(json);
 
@@ -116,10 +123,28 @@ const TalkManager: React.FC = () => {
     setAlertMessage("¡JSON generado y copiado al portapapeles!");
   };
 
-  const processFileUpload = async (data: any[]) => {
+  const processFileUpload = async (data: any) => {
     if (!userId) return;
 
     try {
+      // Determinar si los datos tienen el nuevo formato con metadata global
+      const isNewFormat = data.congregation_name !== undefined || data.addDateStamp !== undefined;
+      const speakersData = isNewFormat ? data.speakers || [] : data;
+      
+      if (!Array.isArray(speakersData)) {
+        throw new Error('El formato del archivo no es válido');
+      }
+
+      // Actualizar los valores globales si están presentes en el archivo
+      if (isNewFormat) {
+        if (data.congregation_name !== undefined) {
+          setCongregation(data.congregation_name);
+        }
+        if (data.addDateStamp !== undefined) {
+          setAddDateStamp(data.addDateStamp);
+        }
+      }
+
       // Eliminar los oradores existentes
       const deletePromises = speakers.map(speaker =>
         deleteDoc(doc(db, getTalksPath(userId), speaker.id))
@@ -128,16 +153,16 @@ const TalkManager: React.FC = () => {
       await Promise.all(deletePromises);
 
       // Agregar los nuevos oradores
-      const addPromises = data.map(speaker =>
+      const addPromises = speakersData.map((speaker: any) =>
         setDoc(doc(db, getTalksPath(userId), speaker.id), {
           first_name: speaker.first_name,
           family_name: speaker.family_name,
           phone: speaker.phone || '',
           role: speaker.role,
-          available: speaker.available !== undefined ? speaker.available : true, // Preserve availability from import or default to true
+          available: speaker.available !== undefined ? speaker.available : true,
           talks: (speaker.talks || []).map((talk: { id: number; available?: boolean; assigned_date?: string }) => ({
             id: talk.id,
-            available: talk.available !== undefined ? talk.available : true, // Preserve talk availability or default to true
+            available: talk.available !== undefined ? talk.available : true,
             assigned_date: talk.assigned_date || ''
           })),
           created_at: speaker.created_at || new Date().toISOString(),
@@ -166,11 +191,15 @@ const TalkManager: React.FC = () => {
         const content = e.target?.result as string;
         const data = JSON.parse(content);
 
-        if (!Array.isArray(data)) {
-          throw new Error('El archivo debe contener un arreglo de oradores');
+        // Verificar si es el nuevo formato con metadata global
+        const isNewFormat = data.congregation_name !== undefined || data.addDateStamp !== undefined;
+        const speakersData = isNewFormat ? data.speakers || [] : data;
+
+        if (!Array.isArray(speakersData)) {
+          throw new Error('El archivo debe contener un arreglo de oradores o un objeto con metadata');
         }
 
-        const isValid = data.every(speaker =>
+        const isValid = speakersData.every((speaker: any) =>
           speaker.id &&
           speaker.first_name &&
           speaker.family_name &&
@@ -183,7 +212,7 @@ const TalkManager: React.FC = () => {
           return;
         }
 
-        // Guardar los datos y mostrar el diálogo de confirmación
+        // Mostrar diálogo de confirmación con información sobre los datos a importar
         setImportData(data);
         setShowImportDialog(true);
 
@@ -209,16 +238,7 @@ const TalkManager: React.FC = () => {
 
     const speakerRef = doc(db, getTalksPath(userId), speakerId);
     try {
-      // Ensure we don't override congregation and addDateStamp with undefined
-      const cleanUpdates = { ...updates };
-      if ('congregation' in updates && !updates.congregation) {
-        cleanUpdates.congregation = undefined;
-      }
-      if ('addDateStamp' in updates) {
-        cleanUpdates.addDateStamp = updates.addDateStamp || undefined;
-      }
-
-      await setDoc(speakerRef, { ...cleanUpdates, updated_at: new Date().toISOString() }, { merge: true });
+      await setDoc(speakerRef, { ...updates, updated_at: new Date().toISOString() }, { merge: true });
     } catch (error) {
       console.error("Error updating speaker:", error);
       setAlertMessage("Error al actualizar el conferenciante.");
@@ -252,8 +272,6 @@ const TalkManager: React.FC = () => {
         phone: newSpeakerPhone.trim(),
         role: newSpeakerRole,
         available: true,
-        congregation: newSpeakerCongregation.trim() || undefined,
-        addDateStamp: addDateStamp || undefined,
         talks: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -261,8 +279,6 @@ const TalkManager: React.FC = () => {
       setNewSpeakerName({ first: '', family: '' });
       setNewSpeakerPhone('');
       setNewSpeakerRole(SPEAKER_ROLES[0].value);
-      setNewSpeakerCongregation('');
-      setAddDateStamp(false);
     } catch (error) {
       console.error("Error adding speaker:", error);
       setAlertMessage("Error al agregar el conferenciante.");
@@ -335,7 +351,7 @@ const TalkManager: React.FC = () => {
     if (isLoading) return "Cargando datos...";
     if (speakers.length === 0) return "No hay conferenciantes registrados.";
 
-    let output = "=== Conferenciantes " + (newSpeakerCongregation ? `de ${newSpeakerCongregation.toUpperCase()} ` : "") + "===\n\n";
+    let output = "=== Conferenciantes " + (congregation ? `de ${congregation.toUpperCase()} ` : "") + "===\n\n";
 
     // Agrupar por rol
     const groupedSpeakers = speakers.reduce((acc, speaker) => {
@@ -390,7 +406,7 @@ const TalkManager: React.FC = () => {
 
     addDateStamp && (output += `\nActualizado: ${new Date().toLocaleString()}`);
     return output;
-  }, [speakers, isLoading, addDateStamp, newSpeakerCongregation]);
+  }, [speakers, isLoading, addDateStamp, congregation]);
 
   // Renderizado
   if (isLoading) {
@@ -534,8 +550,8 @@ const TalkManager: React.FC = () => {
                   <input
                     type="text"
                     id="congregation"
-                    value={newSpeakerCongregation}
-                    onChange={(e) => setNewSpeakerCongregation(e.target.value)}
+                    value={congregation}
+                    onChange={(e) => setCongregation(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
                   />
                 </div>
