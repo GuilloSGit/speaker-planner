@@ -186,7 +186,7 @@ const TalkManager: React.FC = () => {
         // Guardar los datos y mostrar el diálogo de confirmación
         setImportData(data);
         setShowImportDialog(true);
-        
+
       } catch (error) {
         console.error('Error al leer el archivo:', error);
         setAlertMessage(`Error al leer el archivo: ${error instanceof Error ? error.message : 'Formato inválido'}`);
@@ -206,7 +206,7 @@ const TalkManager: React.FC = () => {
   // Función para actualizar un conferenciante
   const updateSpeaker = useCallback(async (speakerId: string, updates: Partial<Speaker>) => {
     if (!userId) return;
-    
+
     const speakerRef = doc(db, getTalksPath(userId), speakerId);
     try {
       // Ensure we don't override congregation and addDateStamp with undefined
@@ -217,7 +217,7 @@ const TalkManager: React.FC = () => {
       if ('addDateStamp' in updates) {
         cleanUpdates.addDateStamp = updates.addDateStamp || undefined;
       }
-      
+
       await setDoc(speakerRef, { ...cleanUpdates, updated_at: new Date().toISOString() }, { merge: true });
     } catch (error) {
       console.error("Error updating speaker:", error);
@@ -419,35 +419,6 @@ const TalkManager: React.FC = () => {
             <section className="bg-white p-4 rounded-xl shadow-md">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Agregar Nuevo Conferenciante</h2>
               <form onSubmit={handleAddSpeaker} className="space-y-4">
-                  {/* Nombre de la congregación de los discursantes */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">
-                        Congregación
-                      </label>
-                      <input
-                        type="text"
-                        id="congregation"
-                        value={newSpeakerCongregation}
-                        onChange={(e) => setNewSpeakerCongregation(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
-                        <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            id="addDateStamp"
-                            checked={addDateStamp}
-                            onChange={(e) => setAddDateStamp(e.target.checked)}
-                            className="h-4 w-4 text-blue-600 mr-2"
-                          />
-                          Agregar fecha al final
-                        </label>
-                      </div>
-                    </div>
-                  </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="first-name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -553,13 +524,45 @@ const TalkManager: React.FC = () => {
           <div className="lg:sticky lg:top-4 h-fit">
             <div className="xl:bg-white p-6 rounded-xl shadow-md">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Vista Previa</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Este es el formato que se compartirá con los demás.
-              </p>
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800">
-                  {shareableOutput}
-                </pre>
+              {/* Puedo poner esto aquí */}
+              {/* Nombre de la congregación de los discursantes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">
+                    Congregación
+                  </label>
+                  <input
+                    type="text"
+                    id="congregation"
+                    value={newSpeakerCongregation}
+                    onChange={(e) => setNewSpeakerCongregation(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
+                    <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="addDateStamp"
+                        checked={addDateStamp}
+                        onChange={(e) => setAddDateStamp(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 mr-2"
+                      />
+                      Agregar fecha al final
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  Este es el formato que se compartirá con los demás.
+                </p>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800">
+                    {shareableOutput}
+                  </pre>
+                </div>
               </div>
               <button
                 onClick={() => {
