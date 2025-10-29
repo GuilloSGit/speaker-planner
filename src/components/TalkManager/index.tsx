@@ -12,6 +12,7 @@ const TalkManager: React.FC = () => {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [newSpeakerCongregation, setNewSpeakerCongregation] = useState('');
   const [newSpeakerName, setNewSpeakerName] = useState({ first: '', family: '' });
   const [newSpeakerPhone, setNewSpeakerPhone] = useState('');
   const [newSpeakerRole, setNewSpeakerRole] = useState(SPEAKER_ROLES[0].value);
@@ -20,13 +21,11 @@ const TalkManager: React.FC = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [speakerToDelete, setSpeakerToDelete] = useState<string | null>(null);
   const [importData, setImportData] = useState<Speaker[]>([]);
+  const [addDateStamp, setAddDateStamp] = useState(false);
 
   // Efecto para autenticación
   useEffect(() => {
-    console.log('Iniciando efecto de autenticación');
-
     const handleAuthStateChanged = async (user: any) => {
-
       if (user) {
         setUserId(user.uid);
       } else {
@@ -49,7 +48,6 @@ const TalkManager: React.FC = () => {
     );
 
     return () => {
-      console.log('Limpiando efecto de autenticación');
       unsubscribe();
     };
   }, []);
@@ -84,7 +82,6 @@ const TalkManager: React.FC = () => {
       );
 
       return () => {
-        console.log('Limpiando suscripción a Firestore');
         unsubscribe();
       };
     } catch (error) {
@@ -99,7 +96,6 @@ const TalkManager: React.FC = () => {
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(output)}`;
     window.open(whatsappLink, '_blank');
   };
-
 
   const generateJSON = () => {
     const json = JSON.stringify(speakers, null, 2);
@@ -208,12 +204,21 @@ const TalkManager: React.FC = () => {
   };
 
   // Función para actualizar un conferenciante
-  const updateSpeaker = useCallback(async (speakerId: string, data: Partial<Speaker>) => {
+  const updateSpeaker = useCallback(async (speakerId: string, updates: Partial<Speaker>) => {
     if (!userId) return;
-
+    
+    const speakerRef = doc(db, getTalksPath(userId), speakerId);
     try {
-      const speakerRef = doc(db, getTalksPath(userId), speakerId);
-      await setDoc(speakerRef, data, { merge: true });
+      // Ensure we don't override congregation and addDateStamp with undefined
+      const cleanUpdates = { ...updates };
+      if ('congregation' in updates && !updates.congregation) {
+        cleanUpdates.congregation = undefined;
+      }
+      if ('addDateStamp' in updates) {
+        cleanUpdates.addDateStamp = updates.addDateStamp || undefined;
+      }
+      
+      await setDoc(speakerRef, { ...cleanUpdates, updated_at: new Date().toISOString() }, { merge: true });
     } catch (error) {
       console.error("Error updating speaker:", error);
       setAlertMessage("Error al actualizar el conferenciante.");
@@ -247,11 +252,17 @@ const TalkManager: React.FC = () => {
         phone: newSpeakerPhone.trim(),
         role: newSpeakerRole,
         available: true,
+        congregation: newSpeakerCongregation.trim() || undefined,
+        addDateStamp: addDateStamp || undefined,
         talks: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
       setNewSpeakerName({ first: '', family: '' });
       setNewSpeakerPhone('');
       setNewSpeakerRole(SPEAKER_ROLES[0].value);
+      setNewSpeakerCongregation('');
+      setAddDateStamp(false);
     } catch (error) {
       console.error("Error adding speaker:", error);
       setAlertMessage("Error al agregar el conferenciante.");
@@ -324,7 +335,7 @@ const TalkManager: React.FC = () => {
     if (isLoading) return "Cargando datos...";
     if (speakers.length === 0) return "No hay conferenciantes registrados.";
 
-    let output = "=== LISTA DE CONFERENCIANTES ===\n\n";
+    let output = "=== Conferenciantes " + (newSpeakerCongregation ? `de ${newSpeakerCongregation.toUpperCase()} ` : "") + "===\n\n";
 
     // Agrupar por rol
     const groupedSpeakers = speakers.reduce((acc, speaker) => {
@@ -377,9 +388,9 @@ const TalkManager: React.FC = () => {
       output += "\n";
     });
 
-    output += `\nActualizado: ${new Date().toLocaleString()}`;
+    addDateStamp && (output += `\nActualizado: ${new Date().toLocaleString()}`);
     return output;
-  }, [speakers, isLoading]);
+  }, [speakers, isLoading, addDateStamp, newSpeakerCongregation]);
 
   // Renderizado
   if (isLoading) {
@@ -408,6 +419,35 @@ const TalkManager: React.FC = () => {
             <section className="bg-white p-4 rounded-xl shadow-md">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Agregar Nuevo Conferenciante</h2>
               <form onSubmit={handleAddSpeaker} className="space-y-4">
+                  {/* Nombre de la congregación de los discursantes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">
+                        Congregación
+                      </label>
+                      <input
+                        type="text"
+                        id="congregation"
+                        value={newSpeakerCongregation}
+                        onChange={(e) => setNewSpeakerCongregation(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
+                        <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            id="addDateStamp"
+                            checked={addDateStamp}
+                            onChange={(e) => setAddDateStamp(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 mr-2"
+                          />
+                          Agregar fecha al final
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="first-name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -490,7 +530,7 @@ const TalkManager: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {speakers.reverse().map(speaker => (
+                  {speakers.map(speaker => (
                     <SpeakerCard
                       key={speaker.id}
                       speaker={speaker}

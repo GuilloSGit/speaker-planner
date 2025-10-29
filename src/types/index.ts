@@ -10,5 +10,9 @@ export interface Speaker {
   phone?: string;
   role: string;
   available: boolean;
+  congregation?: string;
+  addDateStamp?: boolean;
   talks: Talk[];
+  created_at?: string;
+  updated_at?: string;
 }
