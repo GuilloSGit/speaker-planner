@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, doc, setDoc, collection, addDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 // Configuración de Firebase
 const firebaseConfig = {
@@ -39,6 +39,7 @@ export {
   auth, 
   app,
   doc, 
+  getDoc,
   setDoc, 
   collection, 
   addDoc, 

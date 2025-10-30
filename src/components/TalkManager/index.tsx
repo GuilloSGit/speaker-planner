@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SpeakerCard } from './SpeakerCard';
-import { Alert } from './Alert';
-import { ConfirmationDialog } from './ConfirmationDialog';
+import { PlusIcon, TrashIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
 import { Speaker } from '@/types';
 import { MASTER_TALKS, SPEAKER_ROLES, getTalksPath } from '@/lib/constants';
-import { auth, db, doc, setDoc, collection, onSnapshot, query, addDoc, deleteDoc, signInAnonymously } from '@/lib/firebase';
+import { auth, db, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, deleteDoc, signInAnonymously } from '@/lib/firebase';
+import ConferencePdf from '../ConferenceFlyer/ConferenceFlyer';
+import { ConfirmationDialog } from './ConfirmationDialog';
+import { Alert } from './Alert';
 
 const TalkManager: React.FC = () => {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
@@ -22,6 +25,12 @@ const TalkManager: React.FC = () => {
   const [speakerToDelete, setSpeakerToDelete] = useState<string | null>(null);
   const [importData, setImportData] = useState<Speaker[]>([]);
   const [addDateStamp, setAddDateStamp] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [showConfig, setShowConfig] = useState(false);
+  const [meetingDay, setMeetingDay] = useState('sabado');
+  const [meetingTime, setMeetingTime] = useState('18:00');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
 
   // Efecto para autenticación
   useEffect(() => {
@@ -51,6 +60,62 @@ const TalkManager: React.FC = () => {
       unsubscribe();
     };
   }, []);
+
+  // Función para guardar la configuración en Firestore
+  const saveConfig = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      const configRef = doc(db, 'config', userId);
+      await setDoc(configRef, {
+        congregation,
+        contactName,
+        contactPhone,
+        meetingDay,
+        meetingTime,
+        addDateStamp,
+        googleMapsUrl,
+        updated_at: new Date().toISOString(),
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error al guardar la configuración:', error);
+      setAlertMessage('Error al guardar la configuración.');
+    }
+  }, [userId, congregation, contactName, contactPhone, meetingDay, meetingTime, addDateStamp]);
+
+  // Efecto para guardar la configuración cuando cambia
+  useEffect(() => {
+    if (userId) {
+      saveConfig();
+    }
+  }, [saveConfig, userId]);
+
+  // Efecto para cargar la configuración
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadConfig = async () => {
+      try {
+        const configRef = doc(db, 'config', userId);
+        const configDoc = await getDoc(configRef);
+
+        if (configDoc.exists()) {
+          const configData = configDoc.data();
+          if (configData.congregation) setCongregation(configData.congregation);
+          if (configData.contactName) setContactName(configData.contactName);
+          if (configData.contactPhone) setContactPhone(configData.contactPhone);
+          if (configData.meetingDay) setMeetingDay(configData.meetingDay);
+          if (configData.meetingTime) setMeetingTime(configData.meetingTime);
+          if (configData.addDateStamp !== undefined) setAddDateStamp(configData.addDateStamp);
+          if (configData.googleMapsUrl) setGoogleMapsUrl(configData.googleMapsUrl);
+        }
+      } catch (error) {
+        console.error('Error al cargar la configuración:', error);
+      }
+    };
+
+    loadConfig();
+  }, [userId]);
 
   // Efecto para cargar los datos de Firestore
   useEffect(() => {
@@ -97,17 +162,85 @@ const TalkManager: React.FC = () => {
     window.open(whatsappLink, '_blank');
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setAlertMessage("¡Listado copiado al portapapeles!");
+      handleShare();
+    } catch (err) {
+      // Fallback para navegadores antiguos o sin soporte
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        setAlertMessage("¡Listado copiado al portapapeles!");
+        handleShare();
+      } catch (err) {
+        console.error('Error al copiar al portapapeles', err);
+        setAlertMessage("No se pudo copiar al portapapeles. Intenta manualmente.");
+      }
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const handleGeneratePdf = async () => {
+    if (speakers.length === 0) return;
+
+    const fileName = `conferencias-${congregation || 'sin-nombre'}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Import the PDF renderer dynamically to avoid SSR issues
+    const { pdf } = await import('@react-pdf/renderer');
+    const blob = await pdf(
+      <ConferencePdf
+        speakers={speakers}
+        congregation={congregation}
+        contactName={contactName}
+        contactPhone={contactPhone}
+        meetingDay={meetingDay}
+        meetingTime={meetingTime}
+        googleMapsUrl={googleMapsUrl}
+      />).toBlob();
+
+    // Create a URL for the blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link and trigger the download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 0);
+  };
+
   const generateJSON = () => {
+    // Formatear el día de la reunión para mostrarlo correctamente
+    const formattedDay = meetingDay === 'sabado' ? 'Sábado' : 'Domingo';
+
     // Crear objeto con la información global y la lista de oradores
     const exportData = {
       congregation_name: congregation,
       addDateStamp: addDateStamp,
-      speakers: speakers
+      google_maps_url: googleMapsUrl,
+      contact_name: contactName,
+      contact_phone: contactPhone,
+      meeting_day: meetingDay,
+      meeting_time: meetingTime,
+      meeting_schedule: `${formattedDay} - ${meetingTime} hs`,
+      speakers: speakers,
+      // Incluir metadatos adicionales
+      exported_at: new Date().toISOString(),
+      version: '1.0'
     };
-    
+
     const json = JSON.stringify(exportData, null, 2);
-    // Copiar al portapapeles
-    navigator.clipboard.writeText(json);
 
     // Crear un enlace de descarga
     const blob = new Blob([json], { type: 'application/json' });
@@ -120,7 +253,7 @@ const TalkManager: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    setAlertMessage("¡JSON generado y copiado al portapapeles!");
+    setAlertMessage("¡JSON generado!");
   };
 
   const processFileUpload = async (data: any) => {
@@ -130,7 +263,7 @@ const TalkManager: React.FC = () => {
       // Determinar si los datos tienen el nuevo formato con metadata global
       const isNewFormat = data.congregation_name !== undefined || data.addDateStamp !== undefined;
       const speakersData = isNewFormat ? data.speakers || [] : data;
-      
+
       if (!Array.isArray(speakersData)) {
         throw new Error('El formato del archivo no es válido');
       }
@@ -142,6 +275,21 @@ const TalkManager: React.FC = () => {
         }
         if (data.addDateStamp !== undefined) {
           setAddDateStamp(data.addDateStamp);
+        }
+        if (data.google_maps_url !== undefined) {
+          setGoogleMapsUrl(data.google_maps_url);
+        }
+        if (data.contact_name !== undefined) {
+          setContactName(data.contact_name);
+        }
+        if (data.contact_phone !== undefined) {
+          setContactPhone(data.contact_phone);
+        }
+        if (data.meeting_day !== undefined) {
+          setMeetingDay(data.meeting_day);
+        }
+        if (data.meeting_time !== undefined) {
+          setMeetingTime(data.meeting_time);
         }
       }
 
@@ -180,15 +328,14 @@ const TalkManager: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-
-    reader.onload = (e) => {
+    reader.onload = (event) => {
       try {
-        const content = e.target?.result as string;
+        const content = event.target?.result as string;
         const data = JSON.parse(content);
 
         // Verificar si es el nuevo formato con metadata global
@@ -196,35 +343,31 @@ const TalkManager: React.FC = () => {
         const speakersData = isNewFormat ? data.speakers || [] : data;
 
         if (!Array.isArray(speakersData)) {
-          throw new Error('El archivo debe contener un arreglo de oradores o un objeto con metadata');
+          throw new Error('El formato del archivo no es válido');
         }
 
-        const isValid = speakersData.every((speaker: any) =>
-          speaker.id &&
-          speaker.first_name &&
-          speaker.family_name &&
-          speaker.role &&
-          Array.isArray(speaker.talks)
-        );
+        // Actualizar los valores globales si están presentes en el archivo
+        if (isNewFormat) {
+          // Configuración general
+          if (data.congregation_name !== undefined) setCongregation(data.congregation_name);
+          if (data.addDateStamp !== undefined) setAddDateStamp(data.addDateStamp);
+          if (data.meeting_day !== undefined) setMeetingDay(data.meeting_day);
+          if (data.meeting_time !== undefined) setMeetingTime(data.meeting_time);
+          if (data.google_maps_url !== undefined) setGoogleMapsUrl(data.google_maps_url);
 
-        if (!isValid) {
-          setAlertMessage('El formato del archivo no es válido');
-          return;
+          // Datos de contacto
+          if (data.contact_name !== undefined) setContactName(data.contact_name);
+          if (data.contact_phone !== undefined) setContactPhone(data.contact_phone);
         }
 
-        // Mostrar diálogo de confirmación con información sobre los datos a importar
-        setImportData(data);
+        setImportData(speakersData);
         setShowImportDialog(true);
-
+        e.target.value = '';
       } catch (error) {
-        console.error('Error al leer el archivo:', error);
-        setAlertMessage(`Error al leer el archivo: ${error instanceof Error ? error.message : 'Formato inválido'}`);
-      } finally {
-        // Limpiar el input para permitir cargar el mismo archivo de nuevo
-        event.target.value = '';
+        console.error('Error al procesar el archivo:', error);
+        setAlertMessage('Error al procesar el archivo. Asegúrate de que sea un JSON válido.');
       }
     };
-
     reader.onerror = () => {
       setAlertMessage('Error al leer el archivo');
     };
@@ -404,9 +547,31 @@ const TalkManager: React.FC = () => {
       output += "\n";
     });
 
-    addDateStamp && (output += `\nActualizado: ${new Date().toLocaleString()}`);
+
+    contactName && (output += `\nContacto: ${contactName}`);
+    contactPhone && (output += `\nTeléfono: ${contactPhone}`);
+
+    output += "\n";
+
+    /* Horario */
+    (meetingDay || meetingTime) && (output += "\nHorario\n");
+    meetingDay && (output += `Reuniones: ${meetingDay === 'sabado' ? 'Sábado' : 'Domingo'}`);
+    meetingTime && (output += ` - ${meetingTime}`);
+    output += "\n";
+
+
+    /* Google Maps */
+    (googleMapsUrl) && (output += "\nGoogle Maps\n");
+    googleMapsUrl && (output += `${googleMapsUrl}`);
+
+    output += "\n";
+
+    /* Actualizado */
+    (addDateStamp) && (output += "\nActualizado\n");
+    addDateStamp && (output += `${new Date().toLocaleString()}`);
+
     return output;
-  }, [speakers, isLoading, addDateStamp, congregation]);
+  }, [speakers, isLoading, addDateStamp, congregation, meetingDay, meetingTime, googleMapsUrl, contactName, contactPhone]);
 
   // Renderizado
   if (isLoading) {
@@ -428,9 +593,9 @@ const TalkManager: React.FC = () => {
           <p className="text-gray-200 hidden md:block">Gestioná los conferenciantes y sus discursos de tu congregación para organizarlos y compartirlos fácilmente.</p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-20">
           {/* Panel de gestión */}
-          <div className="lg:col-span-1 space-y-8">
+          <div className="lg:col-span-1 space-y-4">
             {/* Formulario para agregar nuevo conferenciante */}
             <section className="bg-white p-4 rounded-xl shadow-md">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Agregar Nuevo Conferenciante</h2>
@@ -494,21 +659,149 @@ const TalkManager: React.FC = () => {
                     </select>
                   </div>
                 </div>
-                <button
-                  disabled={!newSpeakerName.first || !newSpeakerName.family}
+                <Button
                   type="submit"
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:pointer"
+                  variant="primary"
+                  fullWidth
+                  disabled={!newSpeakerName.first || !newSpeakerName.family}
                 >
+                  <PlusIcon className="w-4 h-4 mr-2" />
                   Agregar Conferenciante
-                </button>
+                </Button>
               </form>
             </section>
+
+            {/* Sección de configuración colapsable */}
+            <div className="mb-6 text-md text-gray-600">
+              <Button
+                variant="secondary"
+                onClick={() => setShowConfig(!showConfig)}
+                className="justify-start ml-6  bg-transparent focus:ring-0 border border-dashed border-blue-200"
+              >
+                <span className="flex items-center text-gray-600 hover:text-gray-100">
+                  <span className="mr-2">⚙️</span>
+                  {showConfig ? 'Ocultar opciones' : 'Mostrar más opciones...'}
+                </span>
+              </Button>
+
+              {showConfig && (
+                <div className="mt-2 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Fila 1 - Columna 1: Congregación */}
+                    <div>
+                      <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">
+                        Congregación
+                      </label>
+                      <input
+                        type="text"
+                        id="congregation"
+                        value={congregation}
+                        onChange={(e) => setCongregation(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                      />
+                    </div>
+
+                    {/* Fila 1 - Columna 2: Checkbox de fecha */}
+                    <div className="flex items-end">
+                      <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
+                        <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            id="addDateStamp"
+                            checked={addDateStamp}
+                            onChange={(e) => setAddDateStamp(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 mr-2"
+                          />
+                          Agregar fecha al final
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Fila 2 - Columna 1: Día de reunión */}
+                    <div>
+                      <label htmlFor="meetingDay" className="block text-sm font-medium text-gray-700 mb-1">
+                        Día de reunión de fin de semana
+                      </label>
+                      <select
+                        id="meetingDay"
+                        value={meetingDay}
+                        onChange={(e) => setMeetingDay(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                      >
+                        <option value="sabado">Sábado</option>
+                        <option value="domingo">Domingo</option>
+                      </select>
+                    </div>
+                    {/* Fila 2 - Columna 2: Hora de reunión */}
+                    <div>
+                      <label htmlFor="meetingTime" className="block text-sm font-medium text-gray-700 mb-1">
+                        Hora de reunión de fin de semana
+                      </label>
+                      <input
+                        type="time"
+                        id="meetingTime"
+                        value={meetingTime}
+                        onChange={(e) => setMeetingTime(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                      />
+                    </div>
+
+                    {/* Fila 3 - Columna 1: Nombre de contacto */}
+                    <div>
+                      <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Nombre del contacto de la congregación
+                      </label>
+                      <input
+                        type="text"
+                        id="contactName"
+                        value={contactName}
+                        onChange={(e) => setContactName(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                        placeholder="Ej: Juan Pérez"
+                      />
+                    </div>
+
+                    {/* Fila 3 - Columna 2: Teléfono de contacto */}
+                    <div>
+                      <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                        Teléfono del contacto de la congregación
+                      </label>
+                      <input
+                        type="text"
+                        id="contactPhone"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                        placeholder="Ej: +54 9 11 1234-5678"
+                      />
+                    </div>
+
+                    {/* Fila 4 - Columna 1 y 2: URL de Google Maps */}
+                    <div>
+                      <label htmlFor="googleMapsUrl" className="block text-sm font-medium text-gray-700 mb-1">
+                        URL de Google Maps
+                      </label>
+                      <input
+                        type="text"
+                        id="googleMapsUrl"
+                        value={googleMapsUrl}
+                        onChange={(e) => setGoogleMapsUrl(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                        placeholder="Ej: https://maps.app.goo.gl/..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Lista de conferenciantes */}
             <section>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-blue-600">Conferenciantes</h2>
-                <span className="text-sm text-gray-500">{speakers.length} registrados</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">{speakers.length} registrados</span>
+                </div>
               </div>
 
               {speakers.length === 0 ? (
@@ -540,79 +833,78 @@ const TalkManager: React.FC = () => {
           <div className="lg:sticky lg:top-4 h-fit">
             <div className="xl:bg-white p-6 rounded-xl shadow-md">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Vista Previa</h2>
-              {/* Puedo poner esto aquí */}
-              {/* Nombre de la congregación de los discursantes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">
-                    Congregación
-                  </label>
-                  <input
-                    type="text"
-                    id="congregation"
-                    value={congregation}
-                    onChange={(e) => setCongregation(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
-                    <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        id="addDateStamp"
-                        checked={addDateStamp}
-                        onChange={(e) => setAddDateStamp(e.target.checked)}
-                        className="h-4 w-4 text-blue-600 mr-2"
-                      />
-                      Agregar fecha al final
-                    </label>
-                  </div>
-                </div>
-              </div>
               <div className="mt-4">
                 <p className="text-sm text-gray-600 mb-4">
                   Este es el formato que se compartirá con los demás.
                 </p>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800">
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-gray-800">
                     {shareableOutput}
                   </pre>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(shareableOutput);
-                  setAlertMessage("¡Listado copiado al portapapeles!");
-                  handleShare();
-                }}
-                className="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
-              >
-                Enviarlo por WhatsApp
-              </button>
-              <div className="mt-4 space-y-2">
-                <div className="flex gap-2 w-full">
-                  <button
-                    onClick={generateJSON}
-                    className="w-1/2 bg-yellow-400 text-white py-2 px-4 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                {/* Fila 1 */}
+                <Button
+                  onClick={() => {
+                    handleShare();
+                  }}
+                  variant="success"
+                  className="w-full"
+                >
+                  <ShareIcon className="w-4 h-4 mr-2" />
+                  WhatsApp
+                </Button>
+
+                {/* <Button
+                  onClick={handleGeneratePdf}
+                  disabled={speakers.length === 0}
+                  variant="info"
+                  className="w-full"
+                >
+                  <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
+                  Generar PDF
+                </Button> */}
+
+                {/* disabled button */}
+                <Button
+                  onClick={() => {
+                    setAlertMessage('Estamos trabajando en ello, pronto estará disponible esta funcionalidad');
+                  }}
+                  variant="info"
+                  className="w-full"
+                >
+                  <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
+                  Pronto ... Generar PDF
+                </Button>
+
+                {/* Fila 2 */}
+                <Button
+                  onClick={generateJSON}
+                  variant="warning"
+                  className="w-full"
+                >
+                  <ArrowUpTrayIcon className="w-4 h-4 mr-2" />
+                  Exportar JSON
+                </Button>
+
+                <div>
+                  <input
+                    type="file"
+                    id="json-upload"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    as="label"
+                    htmlFor="json-upload"
+                    variant="primary"
+                    className="w-full cursor-pointer"
                   >
-                    Exportar a JSON
-                  </button>
-                  <div className="relative w-1/2">
-                    <input
-                      type="file"
-                      id="json-upload"
-                      accept=".json"
-                      onChange={handleFileUpload}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <label
-                      htmlFor="json-upload"
-                      className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors text-center cursor-pointer"
-                    >
-                      Importar desde JSON
-                    </label>
-                  </div>
+                    <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+                    Importar JSON
+                  </Button>
                 </div>
               </div>
             </div>
