@@ -202,7 +202,7 @@ const TalkManager: React.FC = () => {
   const handleShare = () => {
     const output = shareableOutput;
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(output)}`;
-    window.open(whatsappLink, '_blank');
+    window.open(whatsappLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleGeneratePdf = async () => {
@@ -214,7 +214,7 @@ const TalkManager: React.FC = () => {
     try {
       // Importar dinámicamente para evitar problemas de SSR
       const { pdf } = await import('@react-pdf/renderer');
-      const fileName = `Conferencias-${congregation ? congregation : ''}.pdf`;
+      const fileName = `Conferencias-${congregation ? `${congregation}` : ''}-${new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long'})}.pdf`;
 
       // Crear el blob del PDF
       const blob = await pdf(
@@ -233,16 +233,16 @@ const TalkManager: React.FC = () => {
       const url = URL.createObjectURL(blob);
 
       // Abrir en una nueva pestaña
-      const newWindow = window.open(url, '_blank');
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
 
       // Liberar memoria cuando ya no sea necesaria
       if (newWindow) {
         newWindow.onload = () => URL.revokeObjectURL(url);
       } else {
-        // Si el navegador bloquea la ventana emergente, forzar la descarga
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
+        document.title = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
