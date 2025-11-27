@@ -121,11 +121,11 @@ export const SpeakerCard: React.FC<SpeakerCardProps> = ({
         </div>
       </div>
       <h4 className="font-semibold text-gray-600 mb-2 mt-4">
-        Discursos: ({speaker.talks.length})
+        Discursos: ({speaker.talks?.length})
       </h4>
       <div className="bg-gray-50 border rounded-lg max-h-60 overflow-y-auto mb-4">
-        {speaker.talks.length > 0 ? (
-          speaker.talks.map(talk => (
+        {speaker.talks?.length > 0 ? (
+          speaker.talks?.map(talk => (
             <TalkItem
               key={`${speaker.id}-${talk.id}`}
               speakerId={speaker.id}
