@@ -152,7 +152,7 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
               )}
               {/* Ancianos */}
               {speakers
-                .filter(speaker => speaker.role === 'Anciano')
+                .filter(speaker => speaker.available !== false && speaker.role === 'Anciano')
                 .map((speaker) => (
                   <View key={speaker.id} style={styles.speakerContainer}>
                     <View style={styles.speakerInfoLine}>
@@ -192,7 +192,7 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
 
               {/* Ministeriales */}
               {speakers
-                .filter(speaker => speaker.role === 'Siervo Ministerial')
+                .filter(speaker => speaker.available !== false && speaker.role === 'Siervo Ministerial')
                 .map((speaker) => (
                   <View key={speaker.id} style={styles.speakerContainer}>
                     <View style={styles.speakerInfoLine}>
