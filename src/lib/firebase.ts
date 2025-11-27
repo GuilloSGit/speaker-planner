@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, initializeAuth, signInAnonymously, signInWithCustomToken, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 // Configuración de Firebase
@@ -15,8 +15,10 @@ const firebaseConfig = {
 
 // Inicializa Firebase
 const app = initializeApp(firebaseConfig);
+const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence
+});
 const db = getFirestore(app);
-const auth = getAuth(app);
 
 // Inicialización condicional de Analytics
 let analytics: any;
