@@ -171,13 +171,16 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
                       </>
                     </View>
 
-                    {speaker.talks?.length > 0 && (
+                    {speaker.talks?.filter(talk => talk.available !== false).length > 0 && (
                       <View style={styles.talksContainer}>
-                        {speaker.talks.map((talk) => (
-                          <Text style={styles.talk} key={talk.id}>
-                            {talk.id} - {getTalkNameById(talk.id.toString())}
-                          </Text>
-                        ))}
+                        {speaker.talks
+                          .filter(talk => talk.available !== false)
+                          .map((talk) => (
+                            <Text style={styles.talk} key={talk.id}>
+                              {talk.id} - {getTalkNameById(talk.id.toString())}
+                            </Text>
+                          ))
+                        }
                       </View>
                     )}
                   </View>
@@ -206,13 +209,16 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
                       )}
                     </View>
 
-                    {speaker.talks?.length > 0 && (
+                    {speaker.talks?.filter(talk => talk.available !== false).length > 0 && (
                       <View style={styles.talksContainer}>
-                        {speaker.talks.map((talk) => (
-                          <Text style={styles.talk} key={talk.id}>
-                            {talk.id} - {getTalkNameById(talk.id.toString())}
-                          </Text>
-                        ))}
+                        {speaker.talks
+                          .filter(talk => talk.available !== false)
+                          .map((talk) => (
+                            <Text style={styles.talk} key={talk.id}>
+                              {talk.id} - {getTalkNameById(talk.id.toString())}
+                            </Text>
+                          ))
+                        }
                       </View>
                     )}
                   </View>
