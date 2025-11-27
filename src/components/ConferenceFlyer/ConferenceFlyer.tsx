@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     flexWrap: 'wrap',
     gap: 2,
     marginBottom: 4
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic'
   },
   speakerPhone: {
-    color: '#1a56db', 
+    color: '#1a56db',
     textDecoration: 'none',
     fontStyle: 'italic'
   },
@@ -89,20 +89,30 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     marginTop: 15,
   },
+  infoRole: {
+    fontSize: 12,
+    backgroundColor: '#003693ff',
+    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 5,
+    marginTop: 15,
+    padding: '5px 15px',
+    borderRadius: 5,
+  },
   contact: {
     marginTop: 10,
     fontSize: 12,
   }
 });
 
-const ConferencePdf: React.FC<ConferencePdfProps> = ({ 
+const ConferencePdf: React.FC<ConferencePdfProps> = ({
   speakers,
-  congregation, 
-  contactName, 
-  contactPhone, 
-  meetingDay, 
-  meetingTime, 
-  googleMapsUrl 
+  congregation,
+  contactName,
+  contactPhone,
+  meetingDay,
+  meetingTime,
+  googleMapsUrl
 }) => {
   const formattedDay = meetingDay === 'sabado' ? 'Sábados' : 'Domingos';
   const currentDate = new Date().toLocaleDateString('es-AR', {
@@ -119,7 +129,7 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Image 
+        <Image
           src="./Conferenciantes.png"
           style={{
             position: 'absolute',
@@ -129,31 +139,36 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
             height: '99.5%',
             zIndex: -1,
             opacity: 0.1
-          }} 
+          }}
         />
-        
+
         <View style={styles.container}>
           <Text style={styles.title}>Conferenciantes {congregation ? `de Congregación ${congregation}` : ''}</Text>
 
           {speakers.length > 0 && (
             <>
-            {speakers.some(speaker => speaker.role === 'Anciano') && (
-              <Text style={styles.info}>Ancianos</Text>
-            )}
+              {speakers.some(speaker => speaker.role === 'Anciano') && (
+                <Text style={[styles.info, styles.infoRole]}>Ancianos</Text>
+              )}
               {/* Ancianos */}
               {speakers
                 .filter(speaker => speaker.role === 'Anciano')
                 .map((speaker) => (
                   <View key={speaker.id} style={styles.speakerContainer}>
                     <View style={styles.speakerInfoLine}>
-                      <Text style={styles.speakerName}>
-                        {speaker.first_name} {speaker.family_name} ({speaker.role})
-                      </Text>
-                      {speaker.phone && (
-                        <Text style={styles.speakerPhone}>
-                          {speaker.phone}
+                      <>
+                        <Text style={styles.speakerName}>
+                          {speaker.first_name} {speaker.family_name}
                         </Text>
-                      )}
+                        <Text style={styles.speakerRole}>
+                          ({speaker.role})
+                        </Text>
+                        {speaker.phone && (
+                          <Text style={styles.speakerPhone}>
+                            +54 {speaker.phone}
+                          </Text>
+                        )}
+                      </>
                     </View>
 
                     {speaker.talks?.length > 0 && (
@@ -168,15 +183,8 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
                   </View>
                 ))}
 
-              {/* Break between roles */}
-              {speakers.some(s => s.role === 'Anciano') && speakers.some(s => s.role === 'Siervo Ministerial') && (
-                <View style={styles.break}>
-                  <Text style={styles.breakText}>• • •</Text>
-                </View>
-              )}
-              
               {speakers.some(speaker => speaker.role === 'Siervo Ministerial') && (
-                <Text style={styles.info}>Ministeriales</Text>
+                <Text style={[styles.info, styles.infoRole]}>Ministeriales</Text>
               )}
 
               {/* Ministeriales */}
@@ -186,11 +194,14 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
                   <View key={speaker.id} style={styles.speakerContainer}>
                     <View style={styles.speakerInfoLine}>
                       <Text style={styles.speakerName}>
-                        {speaker.first_name} {speaker.family_name} ({speaker.role})
+                        {speaker.first_name} {speaker.family_name}
+                      </Text>
+                      <Text style={styles.speakerRole}>
+                        ({speaker.role})
                       </Text>
                       {speaker.phone && (
                         <Text style={styles.speakerPhone}>
-                          {speaker.phone}
+                          +54 {speaker.phone}
                         </Text>
                       )}
                     </View>
@@ -208,26 +219,26 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
                 ))}
             </>
           )}
-          
+
           {(meetingDay || meetingTime) && (
             <Text style={styles.info}>
               Reuniones: {formattedDay} {meetingTime && `- ${meetingTime} hs`}
             </Text>
           )}
-          
+
           {googleMapsUrl && (
             <Text style={styles.info}>
               Ubicación: {googleMapsUrl}
             </Text>
           )}
-          
+
           {(contactName || contactPhone) && (
             <View style={styles.contact}>
               <Text>Contacto: {contactName || ''}</Text>
               {contactPhone && <Text>Teléfono: {contactPhone}</Text>}
             </View>
           )}
-          
+
           {currentDate && (
             <Text style={styles.info}>Actualizado: {currentDate}</Text>
           )}

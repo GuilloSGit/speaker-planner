@@ -187,7 +187,7 @@ const TalkManager: React.FC = () => {
             }
           }
         } else {
-          
+
         }
       } catch (error) {
         console.error('❌ Error al cargar la configuración:', error);
@@ -214,7 +214,7 @@ const TalkManager: React.FC = () => {
     try {
       // Importar dinámicamente para evitar problemas de SSR
       const { pdf } = await import('@react-pdf/renderer');
-      const fileName = `Conferencias-${congregation ? `${congregation}` : ''}-${new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long'})}.pdf`;
+      const fileName = `Conferencias-${congregation ? `${congregation}` : ''}-${new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })}.pdf`;
 
       // Crear el blob del PDF
       const blob = await pdf(
@@ -541,7 +541,7 @@ const TalkManager: React.FC = () => {
       return acc;
     }, {} as Record<string, Speaker[]>);
 
-    // Ordenar los grupos (Ancianos primero, luego Siervos Ministeriales, luego el resto)
+    // Ordenar los grupos (Ancianos primero, luego Siervos Ministeriales)
     const sortedGroups = Object.entries(groupedSpeakers).sort(([roleA], [roleB]) => {
       if (roleA === 'Anciano') return -1;
       if (roleB === 'Anciano') return 1;
@@ -871,7 +871,7 @@ const TalkManager: React.FC = () => {
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Vista Previa</h2>
               <div className="mt-4">
                 <p className="text-sm text-gray-600 mb-4">
-                  Este es el formato que se compartirá con los demás.
+                  Esto se compartirá con los demás.
                 </p>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <pre className="whitespace-pre-wrap font-mono text-xs text-gray-800">
@@ -900,18 +900,6 @@ const TalkManager: React.FC = () => {
                   <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
                   Generar PDF
                 </Button>
-
-                {/* disabled button */}
-                {/* <Button
-                  onClick={() => {
-                    
-                  }}
-                  variant="info"
-                  className="w-full"
-                >
-                  <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
-                  Generar PDF
-                </Button> */}
 
                 {/* Fila 2 */}
                 <Button
