@@ -1,14 +1,12 @@
 import { Document, Page, Text, View, Image, StyleSheet } from '@react-pdf/renderer';
 import { Speaker } from '@/types';
-
-// Usar require para la imagen de fondo
-const backgroundImage = require('../../../public/Conferenciantes.svg');
+import { MASTER_TALKS } from '@/lib/constants';
 
 interface ConferencePdfProps {
   speakers: Speaker[];
-  congregation: string;
-  contactName: string;
-  contactPhone: string;
+  congregation?: string;
+  contactName?: string;
+  contactPhone?: string;
   meetingDay?: string;
   meetingTime?: string;
   googleMapsUrl?: string;
@@ -19,6 +17,54 @@ const styles = StyleSheet.create({
     position: 'relative',
     padding: 40,
     fontFamily: 'Helvetica',
+    backgroundColor: '#ffffff', // Fondo blanco por defecto
+    lineHeight: 1.4
+  },
+  speakerContainer: {
+    marginBottom: 10,
+    paddingBottom: 8,
+    paddingTop: 8,
+    marginLeft: 10,
+  },
+  speakerInfoLine: {
+    fontSize: 10,
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 2,
+    marginBottom: 4
+  },
+  speakerName: {
+    fontWeight: 'bold',
+  },
+  speakerRole: {
+    color: '#666',
+    fontStyle: 'italic'
+  },
+  speakerPhone: {
+    color: '#1a56db', 
+    textDecoration: 'none',
+    fontStyle: 'italic'
+  },
+  talksContainer: {
+    marginTop: 4,
+    paddingLeft: 10,
+    borderLeft: '2px solid #e0e0e0'
+  },
+  talk: {
+    fontSize: 10,
+    marginBottom: 2
+  },
+  break: {
+    textAlign: 'center',
+    margin: '15px 0',
+    color: '#999'
+  },
+  breakText: {
+    fontSize: 14,
+    letterSpacing: 5
   },
   backgroundImage: {
     position: 'absolute',
@@ -30,26 +76,27 @@ const styles = StyleSheet.create({
   },
   container: {
     position: 'relative',
-    zIndex: 1,
+    zIndex: 10,
   },
   title: {
-    fontSize: 24,
-    marginBottom: 20,
+    fontSize: 16,
+    marginBottom: 5,
     textAlign: 'center',
     fontWeight: 'bold',
   },
   info: {
-    marginBottom: 10,
     fontSize: 12,
+    marginBottom: 5,
+    marginTop: 15,
   },
   contact: {
-    marginTop: 20,
+    marginTop: 10,
     fontSize: 12,
   }
 });
 
 const ConferencePdf: React.FC<ConferencePdfProps> = ({ 
-  speakers, 
+  speakers,
   congregation, 
   contactName, 
   contactPhone, 
@@ -64,20 +111,103 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
     day: 'numeric'
   });
 
+  const getTalkNameById = (talkId: string) => {
+    const talk = MASTER_TALKS.find((talk) => talk.id === Number(talkId));
+    return talk ? talk.title : talkId;
+  };
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Fondo */}
         <Image 
-          src={backgroundImage}
-          style={styles.backgroundImage}
+          src="./Conferenciantes.png"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '99.5%',
+            height: '99.5%',
+            zIndex: -1,
+            opacity: 0.1
+          }} 
         />
         
-        {/* Contenido */}
         <View style={styles.container}>
-          <Text style={styles.title}>Arreglos de Conferencias</Text>
-          
-          <Text style={styles.info}>Congregación: {congregation || 'No especificada'}</Text>
+          <Text style={styles.title}>Conferenciantes {congregation ? `de Congregación ${congregation}` : ''}</Text>
+
+          {speakers.length > 0 && (
+            <>
+            {speakers.some(speaker => speaker.role === 'Anciano') && (
+              <Text style={styles.info}>Ancianos</Text>
+            )}
+              {/* Ancianos */}
+              {speakers
+                .filter(speaker => speaker.role === 'Anciano')
+                .map((speaker) => (
+                  <View key={speaker.id} style={styles.speakerContainer}>
+                    <View style={styles.speakerInfoLine}>
+                      <Text style={styles.speakerName}>
+                        {speaker.first_name} {speaker.family_name} ({speaker.role})
+                      </Text>
+                      {speaker.phone && (
+                        <Text style={styles.speakerPhone}>
+                          {speaker.phone}
+                        </Text>
+                      )}
+                    </View>
+
+                    {speaker.talks?.length > 0 && (
+                      <View style={styles.talksContainer}>
+                        {speaker.talks.map((talk) => (
+                          <Text style={styles.talk} key={talk.id}>
+                            {talk.id} - {getTalkNameById(talk.id.toString())}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))}
+
+              {/* Break between roles */}
+              {speakers.some(s => s.role === 'Anciano') && speakers.some(s => s.role === 'Siervo Ministerial') && (
+                <View style={styles.break}>
+                  <Text style={styles.breakText}>• • •</Text>
+                </View>
+              )}
+              
+              {speakers.some(speaker => speaker.role === 'Siervo Ministerial') && (
+                <Text style={styles.info}>Ministeriales</Text>
+              )}
+
+              {/* Ministeriales */}
+              {speakers
+                .filter(speaker => speaker.role === 'Siervo Ministerial')
+                .map((speaker) => (
+                  <View key={speaker.id} style={styles.speakerContainer}>
+                    <View style={styles.speakerInfoLine}>
+                      <Text style={styles.speakerName}>
+                        {speaker.first_name} {speaker.family_name} ({speaker.role})
+                      </Text>
+                      {speaker.phone && (
+                        <Text style={styles.speakerPhone}>
+                          {speaker.phone}
+                        </Text>
+                      )}
+                    </View>
+
+                    {speaker.talks?.length > 0 && (
+                      <View style={styles.talksContainer}>
+                        {speaker.talks.map((talk) => (
+                          <Text style={styles.talk} key={talk.id}>
+                            {talk.id} - {getTalkNameById(talk.id.toString())}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))}
+            </>
+          )}
           
           {(meetingDay || meetingTime) && (
             <Text style={styles.info}>
@@ -91,13 +221,15 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
             </Text>
           )}
           
-          <Text style={styles.info}>Actualizado: {currentDate}</Text>
-          
           {(contactName || contactPhone) && (
             <View style={styles.contact}>
               <Text>Contacto: {contactName || ''}</Text>
               {contactPhone && <Text>Teléfono: {contactPhone}</Text>}
             </View>
+          )}
+          
+          {currentDate && (
+            <Text style={styles.info}>Actualizado: {currentDate}</Text>
           )}
         </View>
       </Page>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SpeakerCard } from './SpeakerCard';
-import { PlusIcon, TrashIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Speaker } from '@/types';
 import { MASTER_TALKS, SPEAKER_ROLES, getTalksPath } from '@/lib/constants';
@@ -10,6 +10,7 @@ import { auth, db, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, d
 import ConferencePdf from '../ConferenceFlyer/ConferenceFlyer';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { Alert } from './Alert';
+import { serverTimestamp } from 'firebase/firestore';
 
 const TalkManager: React.FC = () => {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
@@ -31,6 +32,16 @@ const TalkManager: React.FC = () => {
   const [meetingDay, setMeetingDay] = useState('sabado');
   const [meetingTime, setMeetingTime] = useState('18:00');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+
+  // Efecto para verificar el documento de Firestore
+
+  useEffect(() => {
+    if (userId) {
+      const userDoc = doc(db, 'users', userId);
+      getDoc(userDoc).then(doc => {
+      });
+    }
+  }, [userId]);
 
   // Efecto para autenticación
   useEffect(() => {
@@ -63,25 +74,30 @@ const TalkManager: React.FC = () => {
 
   // Función para guardar la configuración en Firestore
   const saveConfig = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      return;
+    }
 
     try {
-      const configRef = doc(db, 'config', userId);
+      const configRef = doc(db, 'users', userId);
+
       await setDoc(configRef, {
-        congregation,
-        contactName,
-        contactPhone,
-        meetingDay,
-        meetingTime,
-        addDateStamp,
-        googleMapsUrl,
-        updated_at: new Date().toISOString(),
+        config: {
+          congregation,
+          contactName,
+          contactPhone,
+          meetingDay,
+          meetingTime,
+          addDateStamp,
+          googleMapsUrl,
+          updatedAt: serverTimestamp()
+        }
       }, { merge: true });
     } catch (error) {
-      console.error('Error al guardar la configuración:', error);
-      setAlertMessage('Error al guardar la configuración.');
+      console.error('❌ Error al guardar la configuración:', error);
+      setAlertMessage('Error al guardar la configuración: ' + (error as Error).message);
     }
-  }, [userId, congregation, contactName, contactPhone, meetingDay, meetingTime, addDateStamp]);
+  }, [userId, congregation, contactName, contactPhone, meetingDay, meetingTime, addDateStamp, googleMapsUrl]);
 
   // Efecto para guardar la configuración cuando cambia
   useEffect(() => {
@@ -89,33 +105,6 @@ const TalkManager: React.FC = () => {
       saveConfig();
     }
   }, [saveConfig, userId]);
-
-  // Efecto para cargar la configuración
-  useEffect(() => {
-    if (!userId) return;
-
-    const loadConfig = async () => {
-      try {
-        const configRef = doc(db, 'config', userId);
-        const configDoc = await getDoc(configRef);
-
-        if (configDoc.exists()) {
-          const configData = configDoc.data();
-          if (configData.congregation) setCongregation(configData.congregation);
-          if (configData.contactName) setContactName(configData.contactName);
-          if (configData.contactPhone) setContactPhone(configData.contactPhone);
-          if (configData.meetingDay) setMeetingDay(configData.meetingDay);
-          if (configData.meetingTime) setMeetingTime(configData.meetingTime);
-          if (configData.addDateStamp !== undefined) setAddDateStamp(configData.addDateStamp);
-          if (configData.googleMapsUrl) setGoogleMapsUrl(configData.googleMapsUrl);
-        }
-      } catch (error) {
-        console.error('Error al cargar la configuración:', error);
-      }
-    };
-
-    loadConfig();
-  }, [userId]);
 
   // Efecto para cargar los datos de Firestore
   useEffect(() => {
@@ -156,68 +145,115 @@ const TalkManager: React.FC = () => {
     }
   }, [userId]);
 
+  // Efecto para cargar la configuración
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    const loadConfig = async () => {
+
+      try {
+        const userDoc = doc(db, 'users', userId);
+        const userSnapshot = await getDoc(userDoc);
+
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.data();
+
+          if (userData.config) {
+            const config = userData.config;
+
+            // Actualizar los estados
+            if (config.congregation !== undefined) {
+              setCongregation(config.congregation);
+            }
+            if (config.contactName !== undefined) {
+              setContactName(config.contactName);
+            }
+            if (config.contactPhone !== undefined) {
+              setContactPhone(config.contactPhone);
+            }
+            if (config.meetingDay !== undefined) {
+              setMeetingDay(config.meetingDay);
+            }
+            if (config.meetingTime !== undefined) {
+              setMeetingTime(config.meetingTime);
+            }
+            if (config.addDateStamp !== undefined) {
+              setAddDateStamp(config.addDateStamp);
+            }
+            if (config.googleMapsUrl !== undefined) {
+              setGoogleMapsUrl(config.googleMapsUrl);
+            }
+          }
+        } else {
+          
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar la configuración:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, [userId]);
+
   const handleShare = () => {
     const output = shareableOutput;
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(output)}`;
     window.open(whatsappLink, '_blank');
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setAlertMessage("¡Listado copiado al portapapeles!");
-      handleShare();
-    } catch (err) {
-      // Fallback para navegadores antiguos o sin soporte
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand('copy');
-        setAlertMessage("¡Listado copiado al portapapeles!");
-        handleShare();
-      } catch (err) {
-        console.error('Error al copiar al portapapeles', err);
-        setAlertMessage("No se pudo copiar al portapapeles. Intenta manualmente.");
-      }
-      document.body.removeChild(textarea);
-    }
-  };
-
   const handleGeneratePdf = async () => {
-    if (speakers.length === 0) return;
+    if (speakers.length === 0) {
+      setAlertMessage('No hay oradores para generar el PDF');
+      return;
+    }
 
-    const fileName = `conferencias-${congregation || 'sin-nombre'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    try {
+      // Importar dinámicamente para evitar problemas de SSR
+      const { pdf } = await import('@react-pdf/renderer');
+      const fileName = `Conferencias-${congregation ? congregation : ''}.pdf`;
 
-    // Import the PDF renderer dynamically to avoid SSR issues
-    const { pdf } = await import('@react-pdf/renderer');
-    const blob = await pdf(
-      <ConferencePdf
-        speakers={speakers}
-        congregation={congregation}
-        contactName={contactName}
-        contactPhone={contactPhone}
-        meetingDay={meetingDay}
-        meetingTime={meetingTime}
-        googleMapsUrl={googleMapsUrl}
-      />).toBlob();
+      // Crear el blob del PDF
+      const blob = await pdf(
+        <ConferencePdf
+          speakers={speakers}
+          congregation={congregation}
+          contactName={contactName}
+          contactPhone={contactPhone}
+          meetingDay={meetingDay}
+          meetingTime={meetingTime}
+          googleMapsUrl={googleMapsUrl}
+        />
+      ).toBlob();
 
-    // Create a URL for the blob
-    const url = URL.createObjectURL(blob);
+      // Crear una URL para el blob
+      const url = URL.createObjectURL(blob);
 
-    // Create a temporary link and trigger the download
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
+      // Abrir en una nueva pestaña
+      const newWindow = window.open(url, '_blank');
 
-    // Clean up
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 0);
+      // Liberar memoria cuando ya no sea necesaria
+      if (newWindow) {
+        newWindow.onload = () => URL.revokeObjectURL(url);
+      } else {
+        // Si el navegador bloquea la ventana emergente, forzar la descarga
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      setAlertMessage('PDF generado correctamente');
+    } catch (error) {
+      console.error('Error al generar el PDF:', error);
+      setAlertMessage('Error al generar el PDF. Por favor, inténtalo de nuevo.');
+    }
   };
 
   const generateJSON = () => {
@@ -856,27 +892,26 @@ const TalkManager: React.FC = () => {
                   WhatsApp
                 </Button>
 
+                <Button
+                  onClick={speakers.length === 0 ? () => setAlertMessage("No hay conferenciantes registrados. Agrega uno para comenzar.") : handleGeneratePdf}
+                  variant="info"
+                  className="w-full"
+                >
+                  <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
+                  Generar PDF
+                </Button>
+
+                {/* disabled button */}
                 {/* <Button
-                  onClick={handleGeneratePdf}
-                  disabled={speakers.length === 0}
+                  onClick={() => {
+                    
+                  }}
                   variant="info"
                   className="w-full"
                 >
                   <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
                   Generar PDF
                 </Button> */}
-
-                {/* disabled button */}
-                <Button
-                  onClick={() => {
-                    setAlertMessage('Estamos trabajando en ello, pronto estará disponible esta funcionalidad');
-                  }}
-                  variant="info"
-                  className="w-full"
-                >
-                  <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
-                  Pronto ... Generar PDF
-                </Button>
 
                 {/* Fila 2 */}
                 <Button
