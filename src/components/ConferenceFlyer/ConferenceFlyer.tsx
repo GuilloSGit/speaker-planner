@@ -233,9 +233,14 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
           )}
 
           {googleMapsUrl && (
-            <Text style={styles.info}>
-              Ubicación: {googleMapsUrl}
-            </Text>
+            <View style={styles.info}>
+              <Text style={styles.info}>
+                bicación del Salón del Reino en Google Maps:
+              </Text>
+              <Text style={styles.info}>
+                {googleMapsUrl}
+              </Text>
+            </View>
           )}
 
           {(contactName || contactPhone) && (
