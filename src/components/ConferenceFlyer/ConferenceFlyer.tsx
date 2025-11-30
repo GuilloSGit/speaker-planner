@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     zIndex: -1,
+    opacity: 0.1
   },
   container: {
     position: 'relative',
@@ -102,6 +103,44 @@ const styles = StyleSheet.create({
   contact: {
     marginTop: 10,
     fontSize: 12,
+  },
+  pageNumber: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontSize: 10,
+    color: '#666',
+  },
+  sameParagraph: {
+    fontSize: 12,
+    marginBottom: 0,
+    marginTop: 0,
+    alignItems: 'center'
+  },
+  distance: {
+    marginTop: 15,
+  },
+  textBolder: {
+    fontWeight: 'bold',
+  },
+  pageNumberContainer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontSize: 10,
+    color: '#666',
+  },
+  infoContainer: {
+    marginTop: 15,
+    marginLeft: 10
+  },
+  infoDetails: {
+    borderLeft: '2px solid #e0e0e0',
+    paddingLeft: 10
   }
 });
 
@@ -131,15 +170,8 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
       <Page size="A4" style={styles.page}>
         <Image
           src="./Conferenciantes.png"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '99.5%',
-            height: '99.5%',
-            zIndex: -1,
-            opacity: 0.1
-          }}
+          style={styles.backgroundImage}
+          fixed
         />
 
         <View style={styles.container}>
@@ -187,7 +219,7 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
                 ))}
 
               {speakers.some(speaker => speaker.role === 'Siervo Ministerial') && (
-                <Text style={[styles.info, styles.infoRole]}>Ministeriales</Text>
+                <Text style={[styles.info, styles.infoRole]}>Siervos Ministeriales</Text>
               )}
 
               {/* Ministeriales */}
@@ -226,34 +258,64 @@ const ConferencePdf: React.FC<ConferencePdfProps> = ({
             </>
           )}
 
-          {(meetingDay || meetingTime) && (
-            <Text style={styles.info}>
-              Reuniones: {formattedDay} {meetingTime && `- ${meetingTime} hs`}
-            </Text>
-          )}
+          <View style={styles.infoContainer}>
+            <Text style={[styles.infoRole, styles.distance]}>Información de la congregación y contacto</Text>
 
-          {googleMapsUrl && (
-            <View style={styles.info}>
-              <Text style={styles.info}>
-                bicación del Salón del Reino en Google Maps:
-              </Text>
-              <Text style={styles.info}>
-                {googleMapsUrl}
-              </Text>
+          <View style={styles.infoDetails}>
+              {(meetingDay || meetingTime) && (
+                <View style={styles.info}>
+                  <Text style={[styles.sameParagraph, styles.distance, styles.textBolder]}>
+                    Reuniones:
+                  </Text>
+                  <Text style={styles.sameParagraph}>
+                    {formattedDay} {meetingTime && `- ${meetingTime} hs`}
+                  </Text>
+                </View>
+              )}
+
+              {googleMapsUrl && (
+                <View style={styles.info}>
+                  <Text style={[styles.sameParagraph, styles.distance, styles.textBolder]}>
+                    Ubicación del Salón del Reino en Google Maps:
+                  </Text>
+                  <Text style={styles.sameParagraph}>
+                    {googleMapsUrl}
+                  </Text>
+                </View>
+              )}
+
+              {(contactName || contactPhone) && (
+                <View style={styles.contact}>
+                  <Text>Contacto: {contactName || ''}</Text>
+                  {contactPhone && <Text>Teléfono: {contactPhone}</Text>}
+                </View>
+              )}
+
+              {currentDate && (
+                <View style={styles.info}>
+                  <Text style={[styles.sameParagraph, styles.distance, styles.textBolder]}>
+                    Este documento fue actualizado el:
+                  </Text>
+                  <Text style={styles.sameParagraph}>
+                    {currentDate}
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
 
-          {(contactName || contactPhone) && (
-            <View style={styles.contact}>
-              <Text>Contacto: {contactName || ''}</Text>
-              {contactPhone && <Text>Teléfono: {contactPhone}</Text>}
-            </View>
-          )}
-
-          {currentDate && (
-            <Text style={styles.info}>Actualizado: {currentDate}</Text>
-          )}
         </View>
+        
+        {/* PAGINACION */}
+        <View style={styles.pageNumberContainer}>
+        <Text 
+          style={styles.pageNumber}
+          render={({ pageNumber, totalPages }) => (
+            `${pageNumber} / ${totalPages}`
+          )}
+          fixed
+        />
+      </View>
       </Page>
     </Document>
   );

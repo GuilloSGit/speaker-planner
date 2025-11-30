@@ -413,7 +413,7 @@ const TalkManager: React.FC = () => {
   const shareableOutput = useMemo(() => {
     if (isLoading) return "Cargando datos...";
     if (speakers.length === 0) return "No hay conferenciantes registrados.";
-    let output = "=== Conferenciantes " + (congregation ? `de ${congregation.toUpperCase()} ` : "") + "===\n\n";
+    let output = "=== *Conferenciantes* " + (congregation ? `*de la congregación ${congregation.toUpperCase()}*` : "") + "===\n\n";
     const groupedSpeakers = speakers.reduce((acc, speaker) => {
       if (!acc[speaker.role]) acc[speaker.role] = [];
       acc[speaker.role].push(speaker);
@@ -426,10 +426,10 @@ const TalkManager: React.FC = () => {
       if (roleB === 'Siervo Ministerial') return 1;
       return roleA.localeCompare(roleB);
     });
+
     sortedGroups.forEach(([role, roleSpeakers]) => {
-      // Corregir el plural para 'Siervo Ministerial'
       const displayRole = role === 'Siervo Ministerial' ? 'Siervos Ministeriales' : `${role}s`;
-      output += `=== ${displayRole.toUpperCase()} ===\n`;
+      output += `=== *${displayRole.toUpperCase()}* ===\n`;
       const sortedSpeakers = [...roleSpeakers].sort((a, b) => a.family_name.localeCompare(b.family_name));
       const availableSpeakers = sortedSpeakers.filter(speaker => speaker.available);
       availableSpeakers.forEach(speaker => {
@@ -443,23 +443,24 @@ const TalkManager: React.FC = () => {
           output += `  - ${talk.id} - ${talkInfo?.title || 'Título no encontrado'}\n`;
         });
       });
-      output += "\n";
+      output += "\n \n";
     });
-    if (contactName) output += `\nContacto: ${contactName}`;
-    if (contactPhone) output += `\nTeléfono: ${contactPhone}`;
+
+    output += `=== *Información de la Congregación* ${congregation ? `*de la congregación ${congregation.toUpperCase()}*` : ""} ===\n`;
+
+    if (contactName) output += `\n*Contacto:* ${contactName}`;
+    if (contactPhone) output += `\n*Teléfono:* ${contactPhone}`;
     output += "\n";
     if (meetingDay || meetingTime) {
-      output += "\nHorario\n";
-      if (meetingDay) output += `Reuniones: ${meetingDay === 'sabado' ? 'Sábado' : 'Domingo'}`;
-      if (meetingTime) output += ` - ${meetingTime}`;
+      output += `\n*Horario de las Reuniones:*\n${meetingDay === 'sabado' ? 'Sábados' : 'Domingos'} - ${meetingTime} hs`;
       output += "\n";
     }
     if (googleMapsUrl) {
-      output += "\nUbicación del Salón del Reino en Google Maps\n";
+      output += "\n*Ubicación del Salón del Reino en Google Maps:*\n";
       output += `${googleMapsUrl}\n\n`;
     }
     if (addDateStamp) {
-      output += "\nActualizado\n";
+      output += "\n*Este texto se actualizó:*\n";
       output += `${new Date().toLocaleString()}`;
     }
     return output;
@@ -484,15 +485,15 @@ const TalkManager: React.FC = () => {
           <p className="text-gray-200 hidden md:block">Gestioná los conferenciantes y sus discursos de tu congregación para organizarlos y compartirlos fácilmente.</p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-20">
-          {/* Panel de gestión */}
-          <div className="lg:col-span-1 space-y-4">
+        <div className="relative flex flex-col lg:flex-row gap-6 mt-20">
+          {/* Panel de gestión (izquierda) - Scrollable */}
+          <div className="lg:w-1/2 space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 pb-4">
 
-            {/* Config colapsable: AQUÍ el save en onChange/onBlur */}
+            {/* Config colapsable */}
             <div className="flex justify-between items-center mb-4 text-md text-white min-w-full">
-              <Button 
-                variant="primary" 
-                onClick={toggleConfig} 
+              <Button
+                variant="primary"
+                onClick={toggleConfig}
                 className={`justify-start ${showConfig ? 'bg-blue-700' : 'bg-blue-600'} hover:bg-blue-700 focus:ring-0 border border-solid border-blue-200`}
               >
                 <span className="flex items-center text-white hover:text-gray-100">
@@ -500,9 +501,9 @@ const TalkManager: React.FC = () => {
                   {showConfig ? 'Ocultar opciones' : 'Mostrar opciones de Congregación'}
                 </span>
               </Button>
-              <Button 
-                variant="secondary" 
-                onClick={toggleNewSpeakerForm} 
+              <Button
+                variant="secondary"
+                onClick={toggleNewSpeakerForm}
                 className={`justify-start ${showNewSpeakerForm ? 'bg-green-700' : 'bg-green-600'} hover:bg-green-700 focus:ring-0 border border-solid border-green-200`}
               >
                 <span className="flex items-center text-white hover:text-gray-100">
@@ -518,7 +519,7 @@ const TalkManager: React.FC = () => {
                 <h2 className="text-xl font-semibold mb-4 text-blue-600">Opciones de Congregación</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">Congregación</label>
+                    <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">Nombre de la congregación</label>
                     <input type="text" id="congregation" value={congregation} onChange={(e) => { setCongregation(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
                   </div>
                   <div className="flex items-end">
@@ -534,26 +535,26 @@ const TalkManager: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="meetingDay" className="block text-sm font-medium text-gray-700 mb-1">Día de reunión de fin de semana</label>
+                    <label htmlFor="meetingDay" className="block text-sm font-medium text-gray-700 mb-1">Día de reunión de fin de semana {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <select id="meetingDay" value={meetingDay} onChange={(e) => { setMeetingDay(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
                       <option value="sabado">Sábado</option>
                       <option value="domingo">Domingo</option>
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="meetingTime" className="block text-sm font-medium text-gray-700 mb-1">Hora de reunión de fin de semana</label>
+                    <label htmlFor="meetingTime" className="block text-sm font-medium text-gray-700 mb-1">Hora de reunión de fin de semana {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <input type="time" id="meetingTime" value={meetingTime} onChange={(e) => { setMeetingTime(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
                   </div>
                   <div>
-                    <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del contacto de la congregación</label>
+                    <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del contacto de la congregación {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <input type="text" id="contactName" value={contactName} onChange={(e) => { setContactName(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: Juan Pérez" />
                   </div>
                   <div>
-                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono del contacto de la congregación</label>
+                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono del contacto de la congregación {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <input type="text" id="contactPhone" value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: +54 9 11 1234-5678" />
                   </div>
                   <div className="md:col-span-2">
-                    <label htmlFor="googleMapsUrl" className="block text-sm font-medium text-gray-700 mb-1">URL de Google Maps</label>
+                    <label htmlFor="googleMapsUrl" className="block text-sm font-medium text-gray-700 mb-1">URL de Google Maps {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <input type="text" id="googleMapsUrl" value={googleMapsUrl} onChange={(e) => { setGoogleMapsUrl(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: https://maps.app.goo.gl/..." />
                   </div>
                 </div>
@@ -623,13 +624,13 @@ const TalkManager: React.FC = () => {
             </section>
           </div>
 
-          {/* Panel vista previa (sin cambios) */}
-          <div className="lg:sticky lg:top-4 h-fit">
+          {/* Panel vista previa (derecha) - Fijo */}
+          <div className="lg:sticky lg:top-20 lg:self-start lg:w-[48%] h-fit">
             <div className="xl:bg-white p-6 rounded-xl shadow-md">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Vista Previa</h2>
               <div className="mt-4">
                 <p className="text-sm text-gray-600 mb-4">Esto se compartirá con los demás.</p>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-[500px] overflow-y-auto">
                   <pre className="whitespace-pre-wrap font-mono text-xs text-gray-800">{shareableOutput}</pre>
                 </div>
               </div>
