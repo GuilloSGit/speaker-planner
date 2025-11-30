@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SpeakerCard } from './SpeakerCard';
-import { PlusIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { UserPlusIcon, BuildingLibraryIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Speaker } from '@/types';
 import { MASTER_TALKS, SPEAKER_ROLES, getTalksPath } from '@/lib/constants';
@@ -37,7 +37,19 @@ const TalkManager: React.FC = () => {
   const [addDateStamp, setAddDateStamp] = useState(false);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [showConfig, setShowConfig] = useState(false);
+  const [showConfig, setShowConfig] = useState(true);
+  const [showNewSpeakerForm, setShowNewSpeakerForm] = useState(false);
+
+  // Actualizamos las funciones para que solo un panel esté abierto a la vez
+  const toggleConfig = () => {
+    setShowConfig(prev => !prev);
+    if (showNewSpeakerForm) setShowNewSpeakerForm(false);
+  };
+
+  const toggleNewSpeakerForm = () => {
+    setShowNewSpeakerForm(prev => !prev);
+    if (showConfig) setShowConfig(false);
+  };
   const [meetingDay, setMeetingDay] = useState('sabado');
   const [meetingTime, setMeetingTime] = useState('18:00');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -473,92 +485,111 @@ const TalkManager: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-20">
           {/* Panel de gestión */}
           <div className="lg:col-span-1 space-y-4">
-            {/* Formulario agregar conferenciante (sin cambios) */}
-            <section className="bg-white p-4 rounded-xl shadow-md">
-              <h2 className="text-xl font-semibold mb-4 text-blue-600">Agregar Nuevo Conferenciante</h2>
-              <form onSubmit={handleAddSpeaker} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="first-name" className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                    <input type="text" id="first-name" value={newSpeakerName.first} onChange={(e) => setNewSpeakerName(prev => ({ ...prev, first: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600" required />
-                  </div>
-                  <div>
-                    <label htmlFor="family-name" className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
-                    <input type="text" id="family-name" value={newSpeakerName.family} onChange={(e) => setNewSpeakerName(prev => ({ ...prev, family: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600" required />
-                  </div>
-                  <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                    <input type="tel" id="phone" value={newSpeakerPhone} onChange={(e) => setNewSpeakerPhone(e.target.value)} placeholder="11 1234-5678" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600" />
-                  </div>
-                  <div>
-                    <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-                    <select id="role" value={newSpeakerRole} onChange={(e) => setNewSpeakerRole(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600">
-                      {SPEAKER_ROLES.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <Button type="submit" variant="primary" fullWidth disabled={!newSpeakerName.first || !newSpeakerName.family}>
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Agregar Conferenciante
-                </Button>
-              </form>
-            </section>
 
             {/* Config colapsable: AQUÍ el save en onChange/onBlur */}
-            <div className="mb-6 text-md text-gray-600">
-              <Button variant="secondary" onClick={() => setShowConfig(!showConfig)} className="justify-start ml-6 bg-transparent focus:ring-0 border border-dashed border-blue-200">
-                <span className="flex items-center text-gray-600 hover:text-gray-100">
-                  <span className="mr-2">⚙️</span>
-                  {showConfig ? 'Ocultar opciones' : 'Mostrar más opciones...'}
+            <div className="flex justify-between items-center mb-4 text-md text-white min-w-full">
+              <Button 
+                variant="primary" 
+                onClick={toggleConfig} 
+                className={`justify-start ${showConfig ? 'bg-blue-700' : 'bg-blue-600'} hover:bg-blue-700 focus:ring-0 border border-solid border-blue-200`}
+              >
+                <span className="flex items-center text-white hover:text-gray-100">
+                  <BuildingLibraryIcon className="w-5 h-5 mr-2" />
+                  {showConfig ? 'Ocultar opciones' : 'Mostrar opciones de Congregación'}
                 </span>
               </Button>
-              {showConfig && (
-                <div className="mt-2 bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">Congregación</label>
-                      <input type="text" id="congregation" value={congregation} onChange={(e) => { setCongregation(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
-                    </div>
-                    <div className="flex items-end">
-                      <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
-                        <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
-                          <input type="checkbox" 
-                            id="addDateStamp" 
-                            checked={addDateStamp} 
-                            onChange={(e) => { setAddDateStamp(e.target.checked); }} 
-                            className="h-4 w-4 text-blue-600 mr-2" />
-                          Agregar fecha al final
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="meetingDay" className="block text-sm font-medium text-gray-700 mb-1">Día de reunión de fin de semana</label>
-                      <select id="meetingDay" value={meetingDay} onChange={(e) => { setMeetingDay(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
-                        <option value="sabado">Sábado</option>
-                        <option value="domingo">Domingo</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="meetingTime" className="block text-sm font-medium text-gray-700 mb-1">Hora de reunión de fin de semana</label>
-                      <input type="time" id="meetingTime" value={meetingTime} onChange={(e) => { setMeetingTime(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
-                    </div>
-                    <div>
-                      <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del contacto de la congregación</label>
-                      <input type="text" id="contactName" value={contactName} onChange={(e) => { setContactName(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: Juan Pérez" />
-                    </div>
-                    <div>
-                      <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono del contacto de la congregación</label>
-                      <input type="text" id="contactPhone" value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: +54 9 11 1234-5678" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label htmlFor="googleMapsUrl" className="block text-sm font-medium text-gray-700 mb-1">URL de Google Maps</label>
-                      <input type="text" id="googleMapsUrl" value={googleMapsUrl} onChange={(e) => { setGoogleMapsUrl(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: https://maps.app.goo.gl/..." />
-                    </div>
-                  </div>
-                </div>
-              )}
+              <Button 
+                variant="secondary" 
+                onClick={toggleNewSpeakerForm} 
+                className={`justify-start ${showNewSpeakerForm ? 'bg-green-700' : 'bg-green-600'} hover:bg-green-700 focus:ring-0 border border-solid border-green-200`}
+              >
+                <span className="flex items-center text-white hover:text-gray-100">
+                  <UserPlusIcon className="w-5 h-5 mr-2" />
+                  {showNewSpeakerForm ? 'Ocultar formulario' : 'Agregar conferenciante'}
+                </span>
+              </Button>
             </div>
 
+            {/* Formulario de configuración */}
+            {showConfig && (
+              <section className="mt-2 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4 text-blue-600">Opciones de Congregación</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="congregation" className="block text-sm font-medium text-gray-700 mb-1">Congregación</label>
+                    <input type="text" id="congregation" value={congregation} onChange={(e) => { setCongregation(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
+                  </div>
+                  <div className="flex items-end">
+                    <div className="flex items-center h-[42px] border border-gray-300 rounded-md px-3 bg-gray-50 w-full">
+                      <label htmlFor="addDateStamp" className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="checkbox"
+                          id="addDateStamp"
+                          checked={addDateStamp}
+                          onChange={(e) => { setAddDateStamp(e.target.checked); }}
+                          className="h-4 w-4 text-blue-600 mr-2" />
+                        Agregar fecha al final
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="meetingDay" className="block text-sm font-medium text-gray-700 mb-1">Día de reunión de fin de semana</label>
+                    <select id="meetingDay" value={meetingDay} onChange={(e) => { setMeetingDay(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
+                      <option value="sabado">Sábado</option>
+                      <option value="domingo">Domingo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="meetingTime" className="block text-sm font-medium text-gray-700 mb-1">Hora de reunión de fin de semana</label>
+                    <input type="time" id="meetingTime" value={meetingTime} onChange={(e) => { setMeetingTime(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
+                  </div>
+                  <div>
+                    <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del contacto de la congregación</label>
+                    <input type="text" id="contactName" value={contactName} onChange={(e) => { setContactName(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: Juan Pérez" />
+                  </div>
+                  <div>
+                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono del contacto de la congregación</label>
+                    <input type="text" id="contactPhone" value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: +54 9 11 1234-5678" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label htmlFor="googleMapsUrl" className="block text-sm font-medium text-gray-700 mb-1">URL de Google Maps</label>
+                    <input type="text" id="googleMapsUrl" value={googleMapsUrl} onChange={(e) => { setGoogleMapsUrl(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: https://maps.app.goo.gl/..." />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Formulario agregar conferenciante (sin cambios) */}
+            {showNewSpeakerForm && (
+              <section className="bg-white p-4 rounded-xl shadow-md">
+                <h2 className="text-xl font-semibold mb-4 text-blue-600">Agregar Nuevo Conferenciante</h2>
+                <form onSubmit={handleAddSpeaker} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="first-name" className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                      <input type="text" id="first-name" value={newSpeakerName.first} onChange={(e) => setNewSpeakerName(prev => ({ ...prev, first: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600" required />
+                    </div>
+                    <div>
+                      <label htmlFor="family-name" className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
+                      <input type="text" id="family-name" value={newSpeakerName.family} onChange={(e) => setNewSpeakerName(prev => ({ ...prev, family: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600" required />
+                    </div>
+                    <div>
+                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                      <input type="tel" id="phone" value={newSpeakerPhone} onChange={(e) => setNewSpeakerPhone(e.target.value)} placeholder="11 1234-5678" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600" />
+                    </div>
+                    <div>
+                      <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                      <select id="role" value={newSpeakerRole} onChange={(e) => setNewSpeakerRole(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600">
+                        {SPEAKER_ROLES.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <Button type="submit" variant="primary" fullWidth disabled={!newSpeakerName.first || !newSpeakerName.family}>
+                    <UserPlusIcon className="w-4 h-4 mr-2" />
+                    Agregar Conferenciante
+                  </Button>
+                </form>
+              </section>
+            )}
             {/* Lista de conferenciantes (sin cambios) */}
             <section>
               <div className="flex justify-between items-center mb-4">
