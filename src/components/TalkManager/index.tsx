@@ -427,7 +427,9 @@ const TalkManager: React.FC = () => {
       return roleA.localeCompare(roleB);
     });
     sortedGroups.forEach(([role, roleSpeakers]) => {
-      output += `=== ${role.toUpperCase()}S ===\n`;
+      // Corregir el plural para 'Siervo Ministerial'
+      const displayRole = role === 'Siervo Ministerial' ? 'Siervos Ministeriales' : `${role}s`;
+      output += `=== ${displayRole.toUpperCase()} ===\n`;
       const sortedSpeakers = [...roleSpeakers].sort((a, b) => a.family_name.localeCompare(b.family_name));
       const availableSpeakers = sortedSpeakers.filter(speaker => speaker.available);
       availableSpeakers.forEach(speaker => {
@@ -453,7 +455,7 @@ const TalkManager: React.FC = () => {
       output += "\n";
     }
     if (googleMapsUrl) {
-      output += "\nGoogle Maps\n";
+      output += "\nUbicación del Salón del Reino en Google Maps\n";
       output += `${googleMapsUrl}\n\n`;
     }
     if (addDateStamp) {
