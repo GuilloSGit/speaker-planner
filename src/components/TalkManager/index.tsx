@@ -546,11 +546,11 @@ const TalkManager: React.FC = () => {
                     <input type="time" id="meetingTime" value={meetingTime} onChange={(e) => { setMeetingTime(e.target.value); debouncedSave(); }} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" />
                   </div>
                   <div>
-                    <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del contacto de la congregación {congregation ? `de la congregación ${congregation}` : ''}</label>
+                    <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del contacto {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <input type="text" id="contactName" value={contactName} onChange={(e) => { setContactName(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: Juan Pérez" />
                   </div>
                   <div>
-                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono del contacto de la congregación {congregation ? `de la congregación ${congregation}` : ''}</label>
+                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono del contacto {congregation ? `de la congregación ${congregation}` : ''}</label>
                     <input type="text" id="contactPhone" value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); debouncedSave(); }} onBlur={debouncedSave} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Ej: +54 9 11 1234-5678" />
                   </div>
                   <div className="md:col-span-2">
