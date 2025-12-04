@@ -446,7 +446,7 @@ const TalkManager: React.FC = () => {
       output += "\n \n";
     });
 
-    output += `=== *Información de la Congregación* ${congregation ? `*de la congregación ${congregation.toUpperCase()}*` : ""} ===\n`;
+    output += `=== *Información de la Congregación* ${congregation ? `*${congregation.toUpperCase()}*` : ""} ===\n`;
 
     if (contactName) output += `\n*Contacto:* ${contactName}`;
     if (contactPhone) output += `\n*Teléfono:* ${contactPhone}`;
