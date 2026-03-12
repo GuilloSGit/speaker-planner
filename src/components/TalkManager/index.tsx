@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SpeakerCard } from './SpeakerCard';
-import { UserPlusIcon, BuildingLibraryIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { UserPlusIcon, BuildingLibraryIcon, ShareIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, ArrowDownTrayIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Speaker } from '@/types';
 import { MASTER_TALKS, SPEAKER_ROLES, getTalksPath } from '@/lib/constants';
@@ -11,6 +11,7 @@ import ConferencePdf from '../ConferenceFlyer/ConferenceFlyer';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { Alert } from './Alert';
 import { serverTimestamp } from 'firebase/firestore';
+import Link from 'next/link';
 
 // Debounce hook simple para saveConfig (evita saves excesivos)
 function useDebounce(callback: () => void, delay: number) {
@@ -482,6 +483,9 @@ const TalkManager: React.FC = () => {
       <div className="max-w-7xl mx-auto mt-2 mx-6">
         <header className="mb-4 fixed top-0 left-0 pl-10 right-0 z-50 bg-blue-600 text-white p-4 shadow-md">
           <div className='max-w-[900] px-5'>
+            <Link href="/" className="absolute top-4 left-4 p-2 text-white hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">
+              <ArrowLeftIcon className="w-6 h-6" />
+            </Link>
             <h1 className="md:text-3xl max-w-md text-xl font-bold">Gestor de Conferencias</h1>
             <p className="text-gray-200 hidden md:block">Gestioná los conferenciantes y sus discursos de tu congregación para organizarlos y compartirlos fácilmente.</p>
           </div>
