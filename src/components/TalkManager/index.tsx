@@ -488,8 +488,8 @@ const TalkManager: React.FC = () => {
         </header>
 
         <div className="relative flex flex-col lg:flex-row gap-6 mt-20">
-          {/* Panel de gestión (izquierda) - Scrollable */}
-          <div className="lg:w-1/2 space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 pb-4">
+          {/* Panel de gestión (izquierda) */}
+          <div className="lg:w-1/2 space-y-4 pr-2 pb-4">
 
             {/* Config colapsable */}
             <div className="flex justify-between items-center mb-4 text-md text-white min-w-full">
@@ -626,9 +626,9 @@ const TalkManager: React.FC = () => {
             </section>
           </div>
 
-          {/* Panel vista previa (derecha) - Fijo */}
+          {/* Panel vista previa (derecha) - Se mueve con el scroll */}
           <div className="lg:sticky lg:top-20 lg:self-start lg:w-[48%] h-fit">
-            <div className="xl:bg-white p-6 rounded-xl shadow-md">
+            <div className="xl:bg-white p-6 rounded-xl shadow-md mt-14">
               <h2 className="text-xl font-semibold mb-4 text-blue-600">Vista Previa</h2>
               <div className="mt-4">
                 <p className="text-sm text-gray-600 mb-4">Esto se compartirá con los demás.</p>
