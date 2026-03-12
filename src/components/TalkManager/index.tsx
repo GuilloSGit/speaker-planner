@@ -481,8 +481,10 @@ const TalkManager: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto mt-2 mx-6">
         <header className="mb-4 fixed top-0 left-0 pl-10 right-0 z-50 bg-blue-600 text-white p-4 shadow-md">
-          <h1 className="md:text-3xl text-xl font-bold">Gestor de Conferencias</h1>
-          <p className="text-gray-200 hidden md:block">Gestioná los conferenciantes y sus discursos de tu congregación para organizarlos y compartirlos fácilmente.</p>
+          <div className='max-w-[900] px-5'>
+            <h1 className="md:text-3xl max-w-md text-xl font-bold">Gestor de Conferencias</h1>
+            <p className="text-gray-200 hidden md:block">Gestioná los conferenciantes y sus discursos de tu congregación para organizarlos y compartirlos fácilmente.</p>
+          </div>
         </header>
 
         <div className="relative flex flex-col lg:flex-row gap-6 mt-20">
