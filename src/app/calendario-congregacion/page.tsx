@@ -135,7 +135,7 @@ export default function CalendarioCongregacion() {
                     setCurrentMeeting({ type: 'regular', fecha: dateStr });
                     setArregloCongregacion('');
                     setIncomingSpeaker({ nombre: '', apellido: '', telefono: '', congregacion: '', nroDiscurso: 0 });
-                    setOutgoingSpeaker({ speakerId: '', nombre: '', apellido: '', telefono: '', rol: 'Anciano', nroDiscurso: 0, congregacionDestino: '', horarioReunion: '10:00' });
+                    setOutgoingSpeaker({ speakerId: '', nombre: '', apellido: '', telefono: '', rol: 'Siervo Ministerial', nroDiscurso: 0, congregacionDestino: '', horarioReunion: '10:00' });
                     setOtherMeetingDay('sabado');
                     setOtherMeetingTime('18:00');
                     setSelectedLat(null);
@@ -570,25 +570,14 @@ export default function CalendarioCongregacion() {
                                                     placeholder="Arreglo no definido"
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Horario (Allá)</label>
-                                                    <input
-                                                        type="time"
-                                                        value={outgoingSpeaker.horarioReunion}
-                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, horarioReunion: e.target.value })}
-                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
-                                                    <input
-                                                        type="tel"
-                                                        value={outgoingSpeaker.telefono || ''}
-                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, telefono: e.target.value })}
-                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
-                                                    />
-                                                </div>
+                                            <div className="mb-4">
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
+                                                <input
+                                                    type="tel"
+                                                    value={outgoingSpeaker.telefono || ''}
+                                                    onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, telefono: e.target.value })}
+                                                    className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
+                                                />
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <label className="block text-xs font-medium text-gray-700 mb-1">Latitud</label>
