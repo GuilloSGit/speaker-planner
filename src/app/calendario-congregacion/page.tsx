@@ -6,7 +6,10 @@ import { ArrowLeftIcon, CalendarIcon, UserPlusIcon, ArrowRightOnRectangleIcon, A
 import { format, addWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import dynamic from 'next/dynamic';
-import { Meeting, SpecialEventType } from '@/types';
+import { Meeting, SpecialEventType, IncomingSpeaker, OutgoingSpeaker } from '@/types';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { saveMeeting, getMeetingByDate, getSavedMeetingDates } from '@/lib/firebase/meetings';
 
 // Cargamos el mapa asíncronamente para evitar problemas de SSR con Leaflet
 const LocationPickerMap = dynamic(
@@ -26,6 +29,9 @@ const generateDates = (dayToSelect: 'sabado' | 'domingo') => {
 };
 
 export default function CalendarioCongregacion() {
+    // Auth state
+    const [user, setUser] = useState<User | null>(null);
+
     // Default settings (simulating data fetched from Gestor)
     const [meetingDay, setMeetingDay] = useState<'sabado' | 'domingo'>('sabado');
     const [meetingTime, setMeetingTime] = useState('18:00');
@@ -39,18 +45,52 @@ export default function CalendarioCongregacion() {
 
     // Al cambiar la lista de fechas, nos aseguramos que selectDate sintonice con el nuevo día 
     // del mismo fin de semana (para evitar que se pierda la selección actual)
-    const [selectedDate, setSelectedDate] = useState<Date>(memoizedDates[0]);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+    // Fechas que ya tienen programas guardados
+    const [savedDates, setSavedDates] = useState<string[]>([]);
 
     // Efecto para sintonizar el selectedDate si cambia el meetingDay
     React.useEffect(() => {
+        if (!selectedDate) return;
         const offset = meetingDay === 'sabado' ? -1 : 1;
         const newD = addDays(selectedDate, offset);
         setSelectedDate(newD);
     }, [meetingDay]);
 
+    // Auth monitor
+    React.useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+            setUser(u);
+        });
+        return () => unsubscribe();
+    }, []);
+
     // Simulate current meeting state
     const [currentMeeting, setCurrentMeeting] = useState<Partial<Meeting>>({
         type: 'regular',
+        fecha: format(memoizedDates[0], 'yyyy-MM-dd'),
+    });
+
+    // Form states for Column 2 (Incoming)
+    const [incomingSpeaker, setIncomingSpeaker] = useState<IncomingSpeaker>({
+        nombre: '',
+        apellido: '',
+        telefono: '',
+        congregacion: '',
+        nroDiscurso: 0
+    });
+
+    // Form states for Column 3 (Outgoing)
+    const [outgoingSpeaker, setOutgoingSpeaker] = useState<OutgoingSpeaker>({
+        speakerId: '',
+        nombre: '',
+        apellido: '',
+        telefono: '',
+        rol: 'Anciano',
+        nroDiscurso: 0,
+        congregacionDestino: '',
+        horarioReunion: '10:00'
     });
 
     // Config de arreglo para el mes actual/seleccionado
@@ -59,6 +99,111 @@ export default function CalendarioCongregacion() {
     // Estados para el mapa (salida)
     const [selectedLat, setSelectedLat] = useState<number | null>(null);
     const [selectedLng, setSelectedLng] = useState<number | null>(null);
+
+    // Cargar indicadores de fechas guardadas
+    const loadIndicators = async () => {
+        if (user) {
+            const dates = await getSavedMeetingDates(user.uid);
+            setSavedDates(dates);
+        }
+    };
+
+    React.useEffect(() => {
+        loadIndicators();
+    }, [user]);
+
+    // Cargar datos cuando cambia la fecha o el usuario
+    React.useEffect(() => {
+        const loadMeeting = async () => {
+            if (user && selectedDate) {
+                const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                const saved = await getMeetingByDate(user.uid, dateStr);
+                if (saved) {
+                    setCurrentMeeting(saved);
+                    setArregloCongregacion(saved.arregloCongregacion || '');
+                    if (saved.incomingSpeaker) setIncomingSpeaker(saved.incomingSpeaker);
+                    if (saved.outgoingSpeakers && saved.outgoingSpeakers.length > 0) {
+                        const outSpk = saved.outgoingSpeakers[0];
+                        setOutgoingSpeaker(outSpk);
+                        if (outSpk.diaReunion) setOtherMeetingDay(outSpk.diaReunion);
+                        if (outSpk.horarioReunion) setOtherMeetingTime(outSpk.horarioReunion);
+                        setSelectedLat(outSpk.latitudLongitud?.latitud ?? null);
+                        setSelectedLng(outSpk.latitudLongitud?.longitud ?? null);
+                    }
+                } else {
+                    // Reset fields if no saved data
+                    setCurrentMeeting({ type: 'regular', fecha: dateStr });
+                    setArregloCongregacion('');
+                    setIncomingSpeaker({ nombre: '', apellido: '', telefono: '', congregacion: '', nroDiscurso: 0 });
+                    setOutgoingSpeaker({ speakerId: '', nombre: '', apellido: '', telefono: '', rol: 'Anciano', nroDiscurso: 0, congregacionDestino: '', horarioReunion: '10:00' });
+                    setOtherMeetingDay('sabado');
+                    setOtherMeetingTime('18:00');
+                    setSelectedLat(null);
+                    setSelectedLng(null);
+                }
+            }
+        };
+        loadMeeting();
+    }, [selectedDate, user]);
+
+    const handleSave = async () => {
+        if (!user || !selectedDate) return;
+
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const displayDate = format(selectedDate, 'dd/MM/yyyy');
+
+        const isSpecial = currentMeeting.type === 'special';
+        const confirmMessage = isSpecial
+            ? `¿Está seguro que el fin de semana ${displayDate} tendrá lugar este evento: "${currentMeeting.specialEvent || 'Evento Especial'}"?\n\nTenga en cuenta que esto sobreescribirá cualquier programa guardado previamente para esta fecha.`
+            : `¿Desea guardar el programa para el fin de semana ${displayDate}?\n\nTenga en cuenta que esto sobreescribirá cualquier programa guardado previamente para esta fecha.`;
+
+        if (!window.confirm(confirmMessage)) return;
+
+        let meetingToSave: Meeting;
+
+        if (isSpecial) {
+            // Para eventos especiales, solo guardamos lo básico
+            meetingToSave = {
+                type: 'special',
+                fecha: dateStr,
+                specialEvent: currentMeeting.specialEvent || 'Evento Especial',
+                arregloCongregacion: currentMeeting.specialEvent || 'Evento Especial',
+            } as Meeting;
+        } else {
+            // Para reuniones normales, guardamos todo el programa
+            meetingToSave = {
+                type: 'regular',
+                fecha: dateStr,
+                arregloCongregacion,
+                incomingSpeaker,
+                outgoingSpeakers: [{
+                    ...outgoingSpeaker,
+                    diaReunion: otherMeetingDay,
+                    horarioReunion: otherMeetingTime,
+                    latitudLongitud: (selectedLat !== null && selectedLng !== null) ? {
+                        latitud: selectedLat,
+                        longitud: selectedLng
+                    } : undefined
+                }]
+            } as Meeting;
+        }
+
+        try {
+            await saveMeeting(user.uid, meetingToSave);
+            loadIndicators();
+            alert('Programa guardado correctamente');
+        } catch (error) {
+            alert('Error al guardar el programa');
+        }
+    };
+
+    const isFormValid = currentMeeting.type === 'special'
+        ? !!currentMeeting.specialEvent
+        : (arregloCongregacion.trim() !== '' &&
+            incomingSpeaker.nombre.trim() !== '' &&
+            incomingSpeaker.apellido.trim() !== '' &&
+            outgoingSpeaker.nombre.trim() !== '' &&
+            outgoingSpeaker.apellido.trim() !== '');
 
     return (
         <div className="h-screen max-h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -93,7 +238,7 @@ export default function CalendarioCongregacion() {
                     <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-200 min-h-0">
                         <div className="flex flex-col gap-2">
                             {memoizedDates.map((date, i) => {
-                                const isSelected = isSameDay(date, selectedDate);
+                                const isSelected = selectedDate ? isSameDay(date, selectedDate) : false;
                                 const showYearDivider = i > 0 && date.getFullYear() !== memoizedDates[i - 1].getFullYear();
 
                                 return (
@@ -122,10 +267,9 @@ export default function CalendarioCongregacion() {
                                                     {format(date, 'dd')}
                                                 </div>
                                             </div>
-                                            {/* Status indicators placeholder */}
+                                            {/* Status indicators */}
                                             <div className="flex gap-1">
-                                                <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                                                <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                                                <div className={`w-2 h-2 rounded-full ${savedDates.includes(format(date, 'yyyy-MM-dd')) ? 'bg-orange-500' : 'bg-gray-300'}`}></div>
                                             </div>
                                         </button>
                                     </React.Fragment>
@@ -136,7 +280,22 @@ export default function CalendarioCongregacion() {
                 </div>
 
                 {/* Área Principal (Columnas 2 y 3) compartiendo header dinámico */}
-                <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 h-full min-h-0 overflow-hidden">
+                <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 h-full min-h-0 overflow-hidden relative">
+                    {/* Overlay de Glassmorphism si no hay fecha seleccionada */}
+                    {!selectedDate && (
+                        <div className="absolute inset-0 z-[100] backdrop-blur-md bg-white/40 flex items-center justify-center p-6 text-center">
+                            <div className="bg-white/80 p-8 rounded-2xl shadow-xl border border-white/50 max-w-sm transition-all animate-in fade-in zoom-in duration-300">
+                                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <CalendarIcon className="w-10 h-10" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Completar Programa</h3>
+                                <p className="text-gray-600">
+                                    Por favor, seleccione una fecha en la columna de la izquierda para comenzar a gestionar el programa.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Header compartido para la fecha seleccionada */}
                     <div className="p-4 border-b border-gray-200 bg-emerald-50/30 flex justify-between items-center shrink-0">
                         <div></div>
@@ -144,7 +303,22 @@ export default function CalendarioCongregacion() {
                         <div>
                             <select
                                 value={currentMeeting.type || 'regular'}
-                                onChange={(e) => setCurrentMeeting({ ...currentMeeting, type: e.target.value as any })}
+                                onChange={(e) => {
+                                    const newType = e.target.value as 'regular' | 'special';
+                                    if (newType === 'special') {
+                                        // Borrar contenido si se cambia a Evento Especial
+                                        setArregloCongregacion('');
+                                        setIncomingSpeaker({ nombre: '', apellido: '', telefono: '', congregacion: '', nroDiscurso: 0 });
+                                        setOutgoingSpeaker({ speakerId: '', nombre: '', apellido: '', telefono: '', rol: 'Anciano', nroDiscurso: 0, congregacionDestino: '', horarioReunion: '10:00' });
+                                        setSelectedLat(null);
+                                        setSelectedLng(null);
+                                        setCurrentMeeting({ ...currentMeeting, type: newType });
+                                    } else {
+                                        // Si cambia a Normal, nos aseguramos de limpiar campos de Special
+                                        const { specialEvent, ...rest } = currentMeeting;
+                                        setCurrentMeeting({ ...rest, type: newType });
+                                    }
+                                }}
                                 className="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                                 <option value="regular">Reunión Normal</option>
@@ -155,7 +329,7 @@ export default function CalendarioCongregacion() {
 
                     {currentMeeting.type === 'special' ? (
                         /* Vista de Evento Especial (Bloquea las columnas) */
-                        <div className="flex-1 flex items-center justify-center p-8 bg-gray-50/50">
+                        <div className="flex-1 flex-col flex items-center justify-center p-8 bg-gray-50/50">
                             <div className="max-w-md w-full text-center space-y-4">
                                 <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
                                     <span className="text-2xl">⚠️</span>
@@ -163,7 +337,7 @@ export default function CalendarioCongregacion() {
                                 <h3 className="text-xl font-bold text-gray-800">Fecha Reservada</h3>
 
                                 <select
-                                    className="w-full p-3 border border-gray-300 rounded-lg text-center font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    className="w-full p-3 border border-gray-300 rounded-lg text-center text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     value={currentMeeting.specialEvent || ''}
                                     onChange={(e) => setCurrentMeeting({ ...currentMeeting, specialEvent: e.target.value as SpecialEventType })}
                                 >
@@ -181,6 +355,14 @@ export default function CalendarioCongregacion() {
                                     En este fin de semana no se reciben ni se envían conferenciantes locales debido a este evento.
                                 </p>
                             </div>
+                            {/* Necesito un botón para guardar */}
+                            <button
+                                onClick={handleSave}
+                                disabled={!isFormValid}
+                                className="w-1/4 p-3 mt-12 self-center bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Guardar
+                            </button>
                         </div>
                     ) : (
                         /* Columnas 2 y 3 (Recibimos / Enviamos) */
@@ -197,6 +379,15 @@ export default function CalendarioCongregacion() {
                                         className="w-full max-w-sm px-3 py-1.5 text-gray-700 border border-gray-300 rounded bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                     />
                                 </div>
+
+                                {isFormValid && (
+                                    <button
+                                        onClick={handleSave}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-md text-sm font-semibold transition-all shadow-sm flex items-center gap-2"
+                                    >
+                                        <span>Guardar programa de fin de semana</span>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="flex-1 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 overflow-hidden">
@@ -236,41 +427,63 @@ export default function CalendarioCongregacion() {
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
-                                                    <input type="text" className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800" />
+                                                    <input
+                                                        type="text"
+                                                        value={incomingSpeaker.nombre}
+                                                        onChange={(e) => setIncomingSpeaker({ ...incomingSpeaker, nombre: e.target.value })}
+                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label>
-                                                    <input type="text" className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800" />
+                                                    <input
+                                                        type="text"
+                                                        value={incomingSpeaker.apellido}
+                                                        onChange={(e) => setIncomingSpeaker({ ...incomingSpeaker, apellido: e.target.value })}
+                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800"
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
-                                                    <input type="tel" className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800" />
+                                                    <input
+                                                        type="tel"
+                                                        value={incomingSpeaker.telefono || ''}
+                                                        onChange={(e) => setIncomingSpeaker({ ...incomingSpeaker, telefono: e.target.value })}
+                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Congregación</label>
                                                     <input
                                                         type="text"
-                                                        defaultValue={arregloCongregacion}
-                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800 bg-gray-50 text-gray-500"
-                                                        placeholder={arregloCongregacion}
+                                                        value={arregloCongregacion}
+                                                        readOnly
+                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+                                                        placeholder="Arreglo no definido"
                                                     />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Nº Discurso</label>
-                                                    <input type="number" className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800" />
+                                                    <input
+                                                        type="number"
+                                                        value={incomingSpeaker.nroDiscurso || ''}
+                                                        onChange={(e) => setIncomingSpeaker({ ...incomingSpeaker, nroDiscurso: parseInt(e.target.value) || 0 })}
+                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800"
+                                                    />
                                                 </div>
 
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Nº Canción</label>
-                                                    <input type="number" className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800" />
+                                                    <input
+                                                        type="number"
+                                                        value={incomingSpeaker.cancion || ''}
+                                                        onChange={(e) => setIncomingSpeaker({ ...incomingSpeaker, cancion: e.target.value })}
+                                                        className="w-full p-2 border border-gray-300 rounded-md text-sm placeholder:text-gray-400 text-gray-800"
+                                                    />
                                                 </div>
                                             </div>
-
-                                            <button className="w-full py-2 mt-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors">
-                                                <UserPlusIcon className="w-4 h-4" /> Asignar Orador
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -308,66 +521,139 @@ export default function CalendarioCongregacion() {
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
-                                                    <input type="text" className="w-full p-2 border border-gray-300 rounded-md text-sm" />
+                                                    <input
+                                                        type="text"
+                                                        value={outgoingSpeaker.nombre}
+                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, nombre: e.target.value })}
+                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label>
-                                                    <input type="text" className="w-full p-2 border border-gray-300 rounded-md text-sm" />
+                                                    <input
+                                                        type="text"
+                                                        value={outgoingSpeaker.apellido}
+                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, apellido: e.target.value })}
+                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Rol</label>
-                                                    <select className="w-full p-2 border border-gray-300 rounded-md text-sm">
-                                                        <option>Anciano</option>
-                                                        <option>Siervo Ministerial</option>
+                                                    <select
+                                                        value={outgoingSpeaker.rol}
+                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, rol: e.target.value })}
+                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
+                                                    >
+                                                        <option value="Anciano">Anciano</option>
+                                                        <option value="Siervo Ministerial">Siervo Ministerial</option>
                                                     </select>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Nº Discurso</label>
-                                                    <input type="number" className="w-full p-2 border border-gray-300 rounded-md text-sm" />
+                                                    <input
+                                                        type="number"
+                                                        value={outgoingSpeaker.nroDiscurso || ''}
+                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, nroDiscurso: parseInt(e.target.value) || 0 })}
+                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
+                                                    />
                                                 </div>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-700 mb-1">Congregación Destino</label>
                                                 <input
                                                     type="text"
-                                                    defaultValue={arregloCongregacion}
-                                                    className="w-full p-2 border border-gray-300 rounded-md text-sm bg-gray-50 text-gray-500"
-                                                    placeholder="Tipeá hacia dónde va..."
+                                                    value={arregloCongregacion}
+                                                    readOnly
+                                                    className="w-full p-2 border border-gray-300 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+                                                    placeholder="Arreglo no definido"
                                                 />
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Horario (Allá)</label>
-                                                    <input type="time" className="w-full p-2 border border-gray-300 rounded-md text-sm" />
+                                                    <input
+                                                        type="time"
+                                                        value={outgoingSpeaker.horarioReunion}
+                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, horarioReunion: e.target.value })}
+                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
-                                                    <input type="tel" className="w-full p-2 border border-gray-300 rounded-md text-sm" />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">Ubicación (Maps URL u opcional)</label>
-                                                <input type="url" className="w-full p-2 border border-gray-300 rounded-md text-sm mb-2" placeholder="https://maps..." />
-
-                                                <div className="mt-2">
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1 flex justify-between">
-                                                        <span>Punto en el Mapa</span>
-                                                        <span className="text-gray-400 font-normal">Opcional</span>
-                                                    </label>
-                                                    <LocationPickerMap
-                                                        onLocationSelect={(lat, lng) => {
-                                                            setSelectedLat(lat);
-                                                            setSelectedLng(lng);
-                                                        }}
+                                                    <input
+                                                        type="tel"
+                                                        value={outgoingSpeaker.telefono || ''}
+                                                        onChange={(e) => setOutgoingSpeaker({ ...outgoingSpeaker, telefono: e.target.value })}
+                                                        className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm"
                                                     />
                                                 </div>
                                             </div>
-
-                                            <button className="w-full py-2 mt-4 bg-orange-600 text-white rounded-md hover:bg-orange-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors">
-                                                <UserPlusIcon className="w-4 h-4" /> Registrar Salida
-                                            </button>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">Latitud</label>
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    value={selectedLat ?? ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                                        setSelectedLat(val);
+                                                        setOutgoingSpeaker(prev => {
+                                                            if (val === null && selectedLng === null) {
+                                                                const { latitudLongitud, ...rest } = prev;
+                                                                return rest;
+                                                            }
+                                                            return {
+                                                                ...prev,
+                                                                latitudLongitud: {
+                                                                    latitud: val ?? 0,
+                                                                    longitud: selectedLng ?? 0
+                                                                }
+                                                            };
+                                                        });
+                                                    }}
+                                                    className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm mb-2"
+                                                    placeholder="lat"
+                                                />
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">Longitud</label>
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    value={selectedLng ?? ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                                        setSelectedLng(val);
+                                                        setOutgoingSpeaker(prev => {
+                                                            if (selectedLat === null && val === null) {
+                                                                const { latitudLongitud, ...rest } = prev;
+                                                                return rest;
+                                                            }
+                                                            return {
+                                                                ...prev,
+                                                                latitudLongitud: {
+                                                                    latitud: selectedLat ?? 0,
+                                                                    longitud: val ?? 0
+                                                                }
+                                                            };
+                                                        });
+                                                    }}
+                                                    className="w-full p-2 text-gray-800 placeholder:text-gray-400 border border-gray-300 rounded-md text-sm mb-2"
+                                                    placeholder="lng"
+                                                />
+                                            </div>
+                                            <div className="mt-2">
+                                                <label className="block text-xs font-medium text-gray-700 mb-1 flex justify-between">
+                                                    <span>Punto en el Mapa</span>
+                                                    <span className="text-gray-800 font-normal">Opcional</span>
+                                                </label>
+                                                <LocationPickerMap
+                                                    onLocationSelect={(lat, lng) => {
+                                                        setSelectedLat(lat);
+                                                        setSelectedLng(lng);
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

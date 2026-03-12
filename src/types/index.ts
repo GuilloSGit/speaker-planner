@@ -42,10 +42,13 @@ export interface OutgoingSpeaker {
   rol: string;
   nroDiscurso: number;
   congregacionDestino: string;
+  diaReunion?: 'sabado' | 'domingo';
   horarioReunion: string;
   direccionReunion?: string;
-  lat?: number;
-  lng?: number;
+  latitudLongitud?: {
+    latitud: number;
+    longitud: number;
+  };
 }
 
 export type SpecialEventType =
@@ -60,10 +63,12 @@ export type SpecialEventType =
 
 export interface Meeting {
   id?: string;
+  userId?: string;
   fecha: string; // The exact Date string for this particular weekend (e.g. 2024-03-16T00:00:00.000Z)
   time?: string; // Allows a specific meeting to be hosted at a different time from the default (e.g. '18:00')
   type?: 'regular' | 'special';
   specialEvent?: SpecialEventType;
+  arregloCongregacion?: string;
   incomingSpeaker?: IncomingSpeaker;
   outgoingSpeakers?: OutgoingSpeaker[];
   presidente?: MeetingMember;

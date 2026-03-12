@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { db } from '../firebase';
 import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
 import { MASTER_TALKS } from '../constants';
 
